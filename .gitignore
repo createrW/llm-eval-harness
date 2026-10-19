@@ -1,0 +1,40 @@
+# data: raw downloads and run outputs never go to git; small committed samples live in data/samples/
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# experiment tracking + caches
+mlruns/
+mlartifacts/
+.mlflow/
+.cache/
+.superpowers/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# notebooks
+.ipynb_checkpoints/
+
+# secrets / env
+.env
+.env.*
+!.env.example
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/
+*.log
