@@ -3,6 +3,11 @@ import copy
 
 import pytest
 
+from llm_eval.data.dataset import register_task
+from llm_eval.data.hellaswag import HellaSwagTask
+from llm_eval.models.base_model import LoglikelihoodResult
+from llm_eval.models.registry import register_provider
+
 
 @pytest.fixture(scope="session")
 def tiny_tokenizer():
@@ -74,3 +79,64 @@ def tiny_model_dir(tmp_path, tiny_llama, tiny_tokenizer):
     )  # checkpoint config records bf16
     tiny_tokenizer.save_pretrained(d)
     return d
+
+
+RUNNER_ROWS = [
+    {
+        "ind": i,
+        "activity_label": "T",
+        "ctx_a": "Ctx a.",
+        "ctx_b": "x",
+        "ctx": "",
+        "source_id": f"s{i}",
+        "split": "val",
+        "split_type": "indomain",
+        "label": label,
+        "endings": ["aa", "bbbb", "cccccc", "dddddddd"],
+    }
+    for i, label in enumerate(["0", "3", "0", "0"])
+]
+
+
+class FakeModel:
+    """Log-likelihood = -len(continuation): shortest ending wins acc, longest wins acc_norm."""
+
+    supports_loglikelihood = True
+
+    def __init__(self, name="fake", fail_on_context=None):
+        self.name, self.fail_on_context, self.calls = name, fail_on_context, 0
+
+    def loglikelihood(self, requests):
+        self.calls += 1
+        out = []
+        for r in requests:
+            if self.fail_on_context and self.fail_on_context in r.context:
+                raise RuntimeError("boom")
+            out.append(
+                LoglikelihoodResult(
+                    logprob=-float(len(r.continuation)),
+                    n_tokens=len(r.continuation.split()),
+                    n_context_tokens=len(r.context.split()),
+                    latency_ms=1.0,
+                )
+            )
+        return out
+
+    def generate(self, requests):
+        raise NotImplementedError
+
+    def info(self):
+        return {"revision": None, "dtype": "fake", "device": "cpu"}
+
+
+@register_provider("fake", supports_loglikelihood=True)
+def _make_fake(cfg):
+    return FakeModel(name=cfg.name, fail_on_context="BOOM" if cfg.path == "fail" else None)
+
+
+@register_task
+class OfflineHellaSwag(HellaSwagTask):
+    name = "hellaswag_offline"
+
+    def __init__(self, rows=None):
+        super().__init__(rows=rows or (lambda split: RUNNER_ROWS))
