@@ -2018,8 +2018,6 @@ name = "llm-eval-harness"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "datasets" },
-    { name = "huggingface-hub" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pandas" },
@@ -2029,19 +2027,22 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "statsmodels" },
-    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
-    { name = "transformers" },
 ]
 
 [package.optional-dependencies]
 all = [
     { name = "anthropic" },
+    { name = "datasets" },
+    { name = "huggingface-hub" },
+    { name = "matplotlib" },
     { name = "mlflow" },
     { name = "openai" },
     { name = "plotly" },
     { name = "streamlit" },
+    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "transformers" },
 ]
 api = [
     { name = "anthropic" },
@@ -2050,6 +2051,16 @@ api = [
 dashboard = [
     { name = "plotly" },
     { name = "streamlit" },
+]
+local = [
+    { name = "datasets" },
+    { name = "huggingface-hub" },
+    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "transformers" },
+]
+report = [
+    { name = "matplotlib" },
 ]
 tracking = [
     { name = "mlflow" },
@@ -2068,9 +2079,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'api'", specifier = ">=0.40" },
-    { name = "datasets", specifier = ">=3.0" },
-    { name = "huggingface-hub", specifier = ">=0.30" },
-    { name = "llm-eval-harness", extras = ["api", "dashboard", "tracking"], marker = "extra == 'all'" },
+    { name = "datasets", marker = "extra == 'local'", specifier = ">=3.0" },
+    { name = "huggingface-hub", marker = "extra == 'local'", specifier = ">=0.30" },
+    { name = "llm-eval-harness", extras = ["local", "api", "dashboard", "tracking", "report"], marker = "extra == 'all'" },
+    { name = "matplotlib", marker = "extra == 'report'", specifier = ">=3.9" },
     { name = "mlflow", marker = "extra == 'tracking'", specifier = ">=2.16" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "openai", marker = "extra == 'api'", specifier = ">=1.50" },
@@ -2082,12 +2094,12 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13" },
     { name = "statsmodels", specifier = ">=0.14" },
     { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.38" },
-    { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.5,<3" },
-    { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.5,<3", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform == 'linux' and extra == 'local'", specifier = ">=2.5,<3", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform != 'linux' and extra == 'local'", specifier = ">=2.5,<3" },
     { name = "tqdm", specifier = ">=4.66" },
-    { name = "transformers", specifier = ">=4.51,<6" },
+    { name = "transformers", marker = "extra == 'local'", specifier = ">=5.0,<6" },
 ]
-provides-extras = ["api", "dashboard", "tracking", "all"]
+provides-extras = ["local", "api", "dashboard", "tracking", "report", "all"]
 
 [package.metadata.requires-dev]
 dev = [

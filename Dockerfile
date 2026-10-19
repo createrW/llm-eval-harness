@@ -11,13 +11,16 @@ WORKDIR /app
 # dependencies first (cached layer), project second
 COPY pyproject.toml uv.lock README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --all-extras --no-install-project
 COPY src ./src
 COPY configs ./configs
 COPY scripts ./scripts
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --all-extras
 
+# provenance for run.json when the image has no .git (see docs/design.md §7.5)
+ARG LLM_EVAL_GIT_SHA=""
+ENV LLM_EVAL_GIT_SHA=$LLM_EVAL_GIT_SHA
 ENV PATH="/app/.venv/bin:$PATH"
 VOLUME ["/data", "/app/data"]
 ENTRYPOINT ["llm-eval"]

@@ -16,10 +16,6 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-  "torch>=2.5,<3",
-  "transformers>=4.51,<6",
-  "datasets>=3.0",
-  "huggingface-hub>=0.30",
   "pydantic>=2.7",
   "pyyaml>=6.0",
   "pandas>=2.2",
@@ -31,10 +27,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# local inference (torch-free core keeps the Streamlit Cloud install small)
+local = ["torch>=2.5,<3", "transformers>=5.0,<6", "datasets>=3.0", "huggingface-hub>=0.30"]
 api = ["openai>=1.50", "anthropic>=0.40"]
 dashboard = ["streamlit>=1.38", "plotly>=5.24"]
 tracking = ["mlflow>=2.16"]
-all = ["llm-eval-harness[api,dashboard,tracking]"]
+report = ["matplotlib>=3.9"]
+all = ["llm-eval-harness[local,api,dashboard,tracking,report]"]
 
 [dependency-groups]
 dev = [
@@ -60,7 +59,7 @@ build-backend = "hatchling.build"
 packages = ["src/llm_eval"]
 
 # CPU-only torch wheels on Linux keep CI and the Docker image small (the PyPI wheel drags ~3 GB of
-# CUDA libraries). macOS keeps the default PyPI wheel (MPS). On a CUDA box, after `uv sync` run:
+# CUDA libraries). macOS keeps the default PyPI wheel (MPS). On a CUDA box, after `uv sync --extra local` run:
 #   uv pip install --torch-backend=auto torch   # then use the activated .venv (not `uv run`)
 [[tool.uv.index]]
 name = "pytorch-cpu"

@@ -5,4 +5,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 config=${1:?usage: scripts/eval.sh CONFIG_YAML [args...]}
 shift
-exec uv run llm-eval run --config "$config" "$@"
+exec uv run --extra local llm-eval run --config "$config" "$@"
