@@ -92,6 +92,16 @@ class EvalConfig(BaseModel):
             raise ValueError(f"model names must be unique; duplicated: {dup}")
         return v
 
+    @field_validator("tasks")
+    @classmethod
+    def _unique_task_names(cls, v: list[TaskConfig]) -> list[TaskConfig]:
+        if dup := _duplicates([t.name for t in v]):
+            raise ValueError(
+                f"task names must be unique; duplicated: {dup} "
+                "(one split per task per run; use one config per split)"
+            )
+        return v
+
     @field_validator("prompt_variants")
     @classmethod
     def _unique_variants(cls, v: list[PromptVariant]) -> list[PromptVariant]:

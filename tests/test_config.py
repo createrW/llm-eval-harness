@@ -49,6 +49,8 @@ def test_smoke_config_loads_with_documented_values():
         (lambda d: d["models"][0].update(provider="nope"), "provider"),
         (lambda d: d["tasks"][0].update(name="nope"), "task"),
         (lambda d: d["models"].append(dict(d["models"][0])), "unique"),
+        (lambda d: d["tasks"].append(dict(d["tasks"][0])), "unique"),
+        (lambda d: d["tasks"].append({"name": "hellaswag", "split": "train"}), "unique"),
         (lambda d: d.update(prompt_variants=[]), "prompt_variants"),
         (lambda d: d.update(prompt_variants=["zero_shot", "zero_shot"]), "unique"),
         (lambda d: d["models"][0].update(dtype="int8"), "dtype"),
