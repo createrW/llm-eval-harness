@@ -42,7 +42,7 @@ class ModelConfig(BaseModel):
     dtype: Literal["auto", "float32", "float16", "bfloat16"] = "auto"
     device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
     batch_size: int = Field(default=8, ge=1)
-    max_new_tokens: int | None = Field(default=None, ge=1)
+    max_new_tokens: int | None = None
 
     @field_validator("provider")
     @classmethod
@@ -81,8 +81,8 @@ class EvalConfig(BaseModel):
     output_dir: str = "data/processed/runs"
     scoring: Literal["auto"] | ScoringMode = "auto"
     bootstrap_resamples: int = Field(default=1000, ge=1)
-    models: list[ModelConfig] = Field(min_length=1)
-    tasks: list[TaskConfig] = Field(min_length=1)
+    models: list[ModelConfig]
+    tasks: list[TaskConfig]
     prompt_variants: list[PromptVariant] = Field(min_length=1)
 
     @field_validator("models")
