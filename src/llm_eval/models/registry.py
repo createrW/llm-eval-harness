@@ -8,21 +8,29 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from llm_eval.models.base_model import Model
 
 if TYPE_CHECKING:
     from llm_eval.config import ModelConfig
 
-F = TypeVar("F", bound=Callable[["ModelConfig"], Model])
+
+class ModelFactory(Protocol):
+    """``factory(cfg, *, seed)``: build ``cfg``'s model; a non-``None`` ``seed`` seeds the
+    provider's RNG before loading (``torch.manual_seed`` for ``hf``, design §7.5)."""
+
+    def __call__(self, cfg: ModelConfig, *, seed: int | None = None) -> Model: ...
+
+
+F = TypeVar("F", bound=ModelFactory)
 
 
 @dataclass(frozen=True)
 class ProviderSpec:
     """How to build a provider's model, and whether it can score log-likelihoods (design §7.4)."""
 
-    factory: Callable[[ModelConfig], Model]
+    factory: ModelFactory
     supports_loglikelihood: bool
 
 
@@ -41,15 +49,15 @@ def register_provider(name: str, *, supports_loglikelihood: bool) -> Callable[[F
     return decorator
 
 
-def load_model(cfg: ModelConfig) -> Model:
-    """Build the model of ``cfg`` with its provider's factory."""
+def load_model(cfg: ModelConfig, *, seed: int | None = None) -> Model:
+    """Build the model of ``cfg`` with its provider's factory, seeding it with ``seed``."""
     if cfg.provider not in PROVIDERS:
         raise KeyError(f"unknown provider {cfg.provider!r}; known: {sorted(PROVIDERS)}")
-    return PROVIDERS[cfg.provider].factory(cfg)
+    return PROVIDERS[cfg.provider].factory(cfg, seed=seed)
 
 
 @register_provider("hf", supports_loglikelihood=True)
-def _hf(cfg: ModelConfig) -> Model:
+def _hf(cfg: ModelConfig, *, seed: int | None = None) -> Model:
     from llm_eval.models.hf_model import HFCausalLM
 
     return HFCausalLM.from_pretrained(
@@ -59,4 +67,5 @@ def _hf(cfg: ModelConfig) -> Model:
         dtype=cfg.dtype,
         device=cfg.device,
         batch_size=cfg.batch_size,
+        seed=seed,
     )

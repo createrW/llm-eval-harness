@@ -3,7 +3,8 @@
 The only module that imports ``torch``, ``transformers`` and ``huggingface_hub`` (design §5).
 Log-likelihood scoring follows the lm-eval tokenization contract of §7.1: trailing context spaces
 move to the continuation, the pair is encoded as one string, and only the continuation positions
-are scored. ``torch.manual_seed`` before loading is the caller's job (the runner).
+are scored. ``from_pretrained(..., seed=...)`` calls ``torch.manual_seed(seed)`` before loading
+(§7.5); the runner passes the run seed through ``load_model`` so torch stays out of the runner.
 """
 
 from __future__ import annotations
@@ -97,8 +98,15 @@ class HFCausalLM:
         dtype: str = "auto",
         device: str = "auto",
         batch_size: int = 8,
+        seed: int | None = None,
     ) -> HFCausalLM:
-        """Load from a local directory (revision ``None``) or a pinned hub snapshot (§7.5)."""
+        """Load from a local directory (revision ``None``) or a pinned hub snapshot (§7.5).
+
+        A ``seed`` is applied with ``torch.manual_seed`` before anything loads (§7.5, defensive:
+        nothing in eval is stochastic); ``None`` leaves the torch RNG untouched.
+        """
+        if seed is not None:
+            torch.manual_seed(seed)
         device = resolve_device(device)
         if Path(path).is_dir():
             local, revision = path, None

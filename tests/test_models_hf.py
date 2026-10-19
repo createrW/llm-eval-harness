@@ -141,6 +141,26 @@ def test_from_pretrained_hub_path_uses_snapshot_download(monkeypatch, tiny_model
     assert m.info()["revision"] == "0123456789abcdef0123456789abcdef01234567"
 
 
+def test_from_pretrained_seeds_torch_before_loading_only_when_given_a_seed(
+    monkeypatch, tiny_model_dir
+):
+    import llm_eval.models.hf_model as hf
+
+    seeds_at_load = []
+    real = hf.AutoModelForCausalLM.from_pretrained
+
+    def spy(*args, **kwargs):
+        seeds_at_load.append(torch.initial_seed())
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(hf.AutoModelForCausalLM, "from_pretrained", spy)
+    torch.manual_seed(0)
+    HFCausalLM.from_pretrained(str(tiny_model_dir), name="t", device="cpu", seed=1234)
+    torch.manual_seed(5)
+    HFCausalLM.from_pretrained(str(tiny_model_dir), name="t", device="cpu")
+    assert seeds_at_load == [1234, 5]
+
+
 def test_generate_lands_on_day_2(adapter):
     with pytest.raises(NotImplementedError, match="Day 2"):
         adapter.generate([GenerationRequest("hello", 4)])
@@ -167,7 +187,7 @@ def test_registry_hf_factory_forwards_config(monkeypatch):
         device="cpu",
         batch_size=3,
     )
-    assert load_model(cfg) == "MODEL"
+    assert load_model(cfg, seed=7) == "MODEL"
     assert seen == {
         "path": "Qwen/Qwen2.5-0.5B",
         "name": "q",
@@ -175,4 +195,5 @@ def test_registry_hf_factory_forwards_config(monkeypatch):
         "dtype": "auto",
         "device": "cpu",
         "batch_size": 3,
+        "seed": 7,
     }

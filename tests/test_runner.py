@@ -84,6 +84,22 @@ def test_run_config_writes_run_dir_with_hand_derived_accuracies(tmp_path):
     assert "started_at" in meta and "finished_at" in meta and meta["failed_cells"] == []
 
 
+def test_run_config_loads_each_model_with_the_config_seed(tmp_path, monkeypatch):
+    import llm_eval.runner as runner
+
+    seen = []
+    real = runner.load_model
+
+    def spy(mcfg, *, seed=None):
+        seen.append((mcfg.name, seed))
+        return real(mcfg, seed=seed)
+
+    monkeypatch.setattr(runner, "load_model", spy)
+    cfg = dict(CFG, models=[{"name": n, "provider": "fake", "path": "ok"} for n in ("a", "b")])
+    result = run_config(EvalConfig(**cfg), project_root=tmp_path, now=NOW)
+    assert seen == [("a", 3), ("b", 3)] and result.failed_cells == []
+
+
 def test_evaluate_cell_issues_one_loglikelihood_call_per_cell():
     from llm_eval.data.dataset import get_task
     from llm_eval.features.prompts import PromptVariant

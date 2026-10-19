@@ -130,7 +130,7 @@ class FakeModel:
 
 
 @register_provider("fake", supports_loglikelihood=True)
-def _make_fake(cfg):
+def _make_fake(cfg, *, seed=None):
     return FakeModel(name=cfg.name, fail_on_context="BOOM" if cfg.path == "fail" else None)
 
 

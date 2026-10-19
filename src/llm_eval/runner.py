@@ -231,7 +231,7 @@ def run_config(
         cells: list[GridCell] = list(group)
         mcfg = cells[0].model
         try:
-            model = load_model(mcfg)
+            model = load_model(mcfg, seed=cfg.seed)  # hf seeds torch before loading (§7.5)
         except Exception:
             logger.exception("loading model %s failed; skipping its cells", mcfg.name)
             failed_cells += [_cell_name(c.model.name, c.task.name, c.variant) for c in cells]

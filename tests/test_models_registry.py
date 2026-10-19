@@ -32,14 +32,16 @@ def test_dataclasses_are_frozen_with_defaults():
 
 def test_register_provider_and_load_model_dispatch():
     @register_provider("dummy_test_provider", supports_loglikelihood=False)
-    def make(cfg):
-        return SimpleNamespace(name=cfg.name, supports_loglikelihood=False)
+    def make(cfg, *, seed=None):
+        return SimpleNamespace(name=cfg.name, seed=seed, supports_loglikelihood=False)
 
     assert PROVIDERS["dummy_test_provider"] == ProviderSpec(
         factory=make, supports_loglikelihood=False
     )
-    model = load_model(SimpleNamespace(provider="dummy_test_provider", name="m"))
-    assert model.name == "m"
+    cfg = SimpleNamespace(provider="dummy_test_provider", name="m")
+    model = load_model(cfg)
+    assert model.name == "m" and model.seed is None
+    assert load_model(cfg, seed=11).seed == 11
 
 
 def test_load_model_unknown_provider():
