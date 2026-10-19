@@ -171,7 +171,7 @@ def make_task() -> HellaSwagTask:
 
 
 def test_preprocess_matches_lm_eval_rules():
-    assert _preprocess("[header] How to cook pasta [title] Boil water.") == "How to cook pasta. Boil water."
+    assert _preprocess("[header] How to cook pasta [title] Boil water.") == " How to cook pasta. Boil water."  # strip runs before the [header] removal (§7.1)
     assert _preprocess("[substeps] Stir the pot.") == " Stir the pot."
     assert _preprocess("Wait  for it.") == "Wait for it."
     assert _preprocess("  Eat  ") == "Eat"
