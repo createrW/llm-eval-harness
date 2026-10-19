@@ -352,7 +352,7 @@ def expand_grid(cfg: EvalConfig) -> list[GridCell]   # models (outer) × tasks �
 # src/llm_eval/runner.py
 @dataclass class RunResult: run_dir: Path; summary: pd.DataFrame; failed_cells: list[str]
 def evaluate_cell(model: Model, task: Task, examples: Sequence[Example], variant: PromptVariant, scoring: ScoringMode,
-                  *, run_id: str, seed: int, exemplar_seed: int | None = None, n_resamples_unused: None = None) -> list[ExampleRecord]
+                  *, run_id: str, seed: int, exemplar_seed: int | None = None) -> list[ExampleRecord]
 def run_config(cfg: EvalConfig, *, project_root: Path | None = None, now: datetime | None = None) -> RunResult
     # project_root=None → nearest ancestor of cwd containing pyproject.toml, else cwd. Relative output_dir resolves against it.
 def git_info(root: Path) -> tuple[str | None, bool | None]       # (sha, dirty); env LLM_EVAL_GIT_SHA wins; (None, None) if no git
