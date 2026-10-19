@@ -1,0 +1,19 @@
+run_name: smoke_qwen_hellaswag      # required; results under <output_dir>/<run_name>/<run_id>/
+seed: 42                            # subset + bootstrap streams (independent children, §5)
+exemplar_seed: null                 # few-shot exemplar stream; null → seed
+n_examples: 100                     # default for every task; TaskConfig.n_examples overrides
+output_dir: data/processed/runs     # relative paths resolve against the project root; excluded from config_hash
+scoring: auto                       # auto | loglikelihood | generation (resolved per cell, §7.4)
+bootstrap_resamples: 1000
+models:
+  - name: qwen2.5-0.5b              # short id used in results; unique within a config
+    provider: hf                    # must be a key of PROVIDERS (hf; Day 3: openai, anthropic)
+    path: Qwen/Qwen2.5-0.5B
+    revision: null                  # optional HF commit pin; the resolved commit is always recorded
+    dtype: auto                     # auto (= float32) | float32 | float16 | bfloat16
+    device: auto                    # auto | cpu | mps | cuda
+    batch_size: 8
+tasks:
+  - name: hellaswag                 # must be in TASKS
+    split: validation               # default comes from the task
+prompt_variants: [zero_shot]        # subset of {zero_shot, few_shot_3, cot}; non-empty
