@@ -6,10 +6,15 @@ multiplicity-corrected test under a decision rule written before the data exist.
 
 ## Results
 
-<!-- filled by Task 12 -->
+Qwen2.5-0.5B, HellaSwag validation, 100 examples (seed 42), zero-shot log-likelihood, float32 on MPS; interval = seeded percentile bootstrap (1000 resamples).
 
-| model | task | prompt | metric | n | acc [95% CI] | acc_norm [95% CI] |
+| model | task | prompt_variant | metric | n | acc | acc_norm |
 |---|---|---|---|---|---|---|
+| qwen2.5-0.5b | hellaswag | zero_shot | acc_norm | 100 | 0.440 [0.340, 0.540] | 0.520 [0.420, 0.610] |
+
+The run is committed at
+[`data/samples/runs/smoke_qwen_hellaswag/20261019T030343Z-42a02e07/`](data/samples/runs/smoke_qwen_hellaswag/20261019T030343Z-42a02e07/)
+(`uv run llm-eval report --run-dir <that dir>` reprints the table).
 
 ## Why this exists
 
