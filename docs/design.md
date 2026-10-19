@@ -318,7 +318,8 @@ def records_to_frame(records: Sequence[ExampleRecord]) -> pd.DataFrame
 def write_run(run_dir: Path, frame: pd.DataFrame, metadata: dict) -> None
     # asserts (model, task, prompt_variant, example_id) unique; pq.write_table(pa.Table.from_pandas(frame, schema=RESULTS_SCHEMA,
     # preserve_index=False), run_dir/"examples.parquet", compression="zstd"); run.json = metadata (§8.2)
-def read_run(run_dir: Path) -> tuple[pd.DataFrame, dict]   # list columns come back as numpy arrays
+def read_run(run_dir: Path) -> tuple[pd.DataFrame, dict]   # pd.ArrowDtype-backed frame (types_mapper=pd.ArrowDtype);
+    # list columns come back as Python lists (None when null), not numpy arrays: wrap in np.asarray(...) for numpy math
 ```
 
 ```python

@@ -1,6 +1,7 @@
 import dataclasses
 import json
 
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -120,3 +121,14 @@ def test_parquet_is_zstd_compressed(tmp_path):
     write_run(tmp_path / "run", records_to_frame([record(0)]), {})
     meta = pq.ParquetFile(tmp_path / "run" / "examples.parquet").metadata
     assert meta.row_group(0).column(0).compression == "ZSTD"
+
+
+def test_read_run_returns_arrow_dtypes_and_python_list_cells(tmp_path):
+    frame = records_to_frame([record(0, exemplar_ids=("a", "b"))])
+    write_run(tmp_path / "run", frame, {})
+    back, _ = read_run(tmp_path / "run")
+    assert all(isinstance(t, pd.ArrowDtype) for t in back.dtypes)
+    assert back["choice_logprobs"].dtype == pd.ArrowDtype(pa.list_(pa.float64()))
+    cell = back["choice_logprobs"].iloc[0]
+    assert type(cell) is list and cell == [-1.0, -2.0]
+    assert back["exemplar_ids"].iloc[0] == ["a", "b"]
