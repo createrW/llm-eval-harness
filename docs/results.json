@@ -1,0 +1,317 @@
+{
+ "families": [
+  {
+   "task": "hellaswag",
+   "scoring": "loglikelihood",
+   "metric": "acc_norm",
+   "mde": {
+    "k": 4,
+    "n": 500,
+    "discordance": 0.125,
+    "mde": 0.05265100687357455
+   },
+   "cells": [
+    {
+     "model": "qwen2.5-0.5b",
+     "prompt_variant": "zero_shot",
+     "acc": 0.494,
+     "ci_low": 0.45,
+     "ci_high": 0.536,
+     "n_ok": 500,
+     "n_error": 0,
+     "parse_failure_rate": null,
+     "truncation_rate": null
+    },
+    {
+     "model": "qwen2.5-0.5b",
+     "prompt_variant": "few_shot_3",
+     "acc": 0.49,
+     "ci_low": 0.448,
+     "ci_high": 0.53205,
+     "n_ok": 500,
+     "n_error": 0,
+     "parse_failure_rate": null,
+     "truncation_rate": null
+    },
+    {
+     "model": "llama-3.2-1b",
+     "prompt_variant": "zero_shot",
+     "acc": 0.632,
+     "ci_low": 0.58995,
+     "ci_high": 0.67405,
+     "n_ok": 500,
+     "n_error": 0,
+     "parse_failure_rate": null,
+     "truncation_rate": null
+    },
+    {
+     "model": "llama-3.2-1b",
+     "prompt_variant": "few_shot_3",
+     "acc": 0.636,
+     "ci_low": 0.594,
+     "ci_high": 0.676,
+     "n_ok": 500,
+     "n_error": 0,
+     "parse_failure_rate": null,
+     "truncation_rate": null
+    }
+   ],
+   "per_model": [
+    {
+     "model": "qwen2.5-0.5b",
+     "acc": 0.492,
+     "ci_low": 0.45,
+     "ci_high": 0.534025,
+     "n": 500,
+     "cells": 2
+    },
+    {
+     "model": "llama-3.2-1b",
+     "acc": 0.634,
+     "ci_low": 0.5949749999999999,
+     "ci_high": 0.674,
+     "n": 500,
+     "cells": 2
+    }
+   ],
+   "per_prompt": [
+    {
+     "prompt_variant": "zero_shot",
+     "acc": 0.563,
+     "ci_low": 0.523,
+     "ci_high": 0.604,
+     "n": 500,
+     "cells": 2
+    },
+    {
+     "prompt_variant": "few_shot_3",
+     "acc": 0.563,
+     "ci_low": 0.523,
+     "ci_high": 0.602,
+     "n": 500,
+     "cells": 2
+    }
+   ],
+   "comparisons": [
+    {
+     "a": [
+      "qwen2.5-0.5b",
+      "zero_shot"
+     ],
+     "b": [
+      "qwen2.5-0.5b",
+      "few_shot_3"
+     ],
+     "kind": "prompt",
+     "n": 500,
+     "acc_a": 0.494,
+     "acc_b": 0.49,
+     "diff": 0.004,
+     "diff_low": -0.014,
+     "diff_high": 0.022,
+     "n10": 11,
+     "n01": 9,
+     "wilcoxon_p": 0.6547208460185769,
+     "mcnemar_p": 0.8238029479980469,
+     "wilcoxon_bonf": 1.0,
+     "wilcoxon_holm": 1.0,
+     "mcnemar_bonf": 1.0,
+     "verdict": "underpowered \u2014 no conclusion",
+     "flags": []
+    },
+    {
+     "a": [
+      "qwen2.5-0.5b",
+      "zero_shot"
+     ],
+     "b": [
+      "llama-3.2-1b",
+      "zero_shot"
+     ],
+     "kind": "model",
+     "n": 500,
+     "acc_a": 0.494,
+     "acc_b": 0.632,
+     "diff": -0.138,
+     "diff_low": -0.172,
+     "diff_high": -0.106,
+     "n10": 7,
+     "n01": 76,
+     "wilcoxon_p": 3.626467548786281e-14,
+     "mcnemar_p": 9.43054794183671e-16,
+     "wilcoxon_bonf": 1.4505870195145124e-13,
+     "wilcoxon_holm": 1.0879402646358843e-13,
+     "mcnemar_bonf": 3.772219176734684e-15,
+     "verdict": "B > A",
+     "flags": []
+    },
+    {
+     "a": [
+      "qwen2.5-0.5b",
+      "zero_shot"
+     ],
+     "b": [
+      "llama-3.2-1b",
+      "few_shot_3"
+     ],
+     "kind": "exploratory",
+     "n": 500,
+     "acc_a": 0.494,
+     "acc_b": 0.636,
+     "diff": -0.142,
+     "diff_low": -0.178,
+     "diff_high": -0.11,
+     "n10": 8,
+     "n01": 79,
+     "wilcoxon_p": 2.6988865519036797e-14,
+     "mcnemar_p": 8.377941473730054e-16,
+     "wilcoxon_bonf": null,
+     "wilcoxon_holm": null,
+     "mcnemar_bonf": null,
+     "verdict": "exploratory",
+     "flags": []
+    },
+    {
+     "a": [
+      "qwen2.5-0.5b",
+      "few_shot_3"
+     ],
+     "b": [
+      "llama-3.2-1b",
+      "zero_shot"
+     ],
+     "kind": "exploratory",
+     "n": 500,
+     "acc_a": 0.49,
+     "acc_b": 0.632,
+     "diff": -0.142,
+     "diff_low": -0.174,
+     "diff_high": -0.108,
+     "n10": 5,
+     "n01": 76,
+     "wilcoxon_p": 3.0488881880005382e-15,
+     "mcnemar_p": 2.2643223890053103e-17,
+     "wilcoxon_bonf": null,
+     "wilcoxon_holm": null,
+     "mcnemar_bonf": null,
+     "verdict": "exploratory",
+     "flags": []
+    },
+    {
+     "a": [
+      "qwen2.5-0.5b",
+      "few_shot_3"
+     ],
+     "b": [
+      "llama-3.2-1b",
+      "few_shot_3"
+     ],
+     "kind": "model",
+     "n": 500,
+     "acc_a": 0.49,
+     "acc_b": 0.636,
+     "diff": -0.146,
+     "diff_low": -0.18,
+     "diff_high": -0.114,
+     "n10": 5,
+     "n01": 78,
+     "wilcoxon_p": 1.1213412693159895e-15,
+     "mcnemar_p": 6.403904916571207e-18,
+     "wilcoxon_bonf": 4.485365077263958e-15,
+     "wilcoxon_holm": 4.485365077263958e-15,
+     "mcnemar_bonf": 2.5615619666284828e-17,
+     "verdict": "B > A",
+     "flags": []
+    },
+    {
+     "a": [
+      "llama-3.2-1b",
+      "zero_shot"
+     ],
+     "b": [
+      "llama-3.2-1b",
+      "few_shot_3"
+     ],
+     "kind": "prompt",
+     "n": 500,
+     "acc_a": 0.632,
+     "acc_b": 0.636,
+     "diff": -0.004,
+     "diff_low": -0.03,
+     "diff_high": 0.02,
+     "n10": 20,
+     "n01": 22,
+     "wilcoxon_p": 0.7576207236833965,
+     "mcnemar_p": 0.8776143287523154,
+     "wilcoxon_bonf": 1.0,
+     "wilcoxon_holm": 1.0,
+     "mcnemar_bonf": 1.0,
+     "verdict": "underpowered \u2014 no conclusion",
+     "flags": []
+    }
+   ],
+   "variance": {
+    "n": 500,
+    "shares": {
+     "model": {
+      "share": 0.9992071357779981,
+      "ci_low": 0.9712517822410895,
+      "ci_high": 0.999812382739212
+     },
+     "prompt": {
+      "share": 2.44320151517905e-30,
+      "ci_low": 0.0,
+      "ci_high": 0.01567266566696901
+     },
+     "interaction": {
+      "share": 0.0007928642220019835,
+      "ci_low": 1.1584006194223181e-30,
+      "ci_high": 0.020953720937235836
+     }
+    },
+    "anova": [
+     {
+      "term": "example (item difficulty)",
+      "df": 499,
+      "sum_sq": 393.06200000000115,
+      "share": 0.7988058415402937,
+      "F": 13.262692610505047,
+      "p": 0.0
+     },
+     {
+      "term": "model",
+      "df": 1,
+      "sum_sq": 10.082000000000352,
+      "share": 0.020489287935260846,
+      "F": 169.75316612305173,
+      "p": 7.773609972665296e-37
+     },
+     {
+      "term": "prompt",
+      "df": 1,
+      "sum_sq": 2.720706785499007e-27,
+      "share": 5.5291950719604415e-30,
+      "F": 4.580922346071323e-26,
+      "p": 0.9999999999998292
+     },
+     {
+      "term": "model \u00d7 prompt",
+      "df": 1,
+      "sum_sq": 0.007999999999970846,
+      "share": 1.6258113814866463e-05,
+      "F": 0.13469800922231873,
+      "p": 0.7136617342104603
+     },
+     {
+      "term": "residual",
+      "df": 1497,
+      "sum_sq": 88.91,
+      "share": 0.18068861241063064,
+      "F": null,
+      "p": null
+     }
+    ]
+   }
+  }
+ ]
+}

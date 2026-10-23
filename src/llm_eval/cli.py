@@ -128,7 +128,13 @@ def _analyze(args: argparse.Namespace) -> int:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(analysis.to_json(families, retest), encoding="utf-8")
     if args.readme:
-        block = analysis_report.readme_block(families, retest=retest, hypotheses=hypotheses)
+        counts: dict[str, int] = {}
+        for run in runs:  # <run_name>/<run_id>/ by layout
+            name = str(run.meta.get("run_name") or run.run_dir.parent.name)
+            counts[name] = counts.get(name, 0) + 1
+        block = analysis_report.readme_block(
+            families, retest=retest, hypotheses=hypotheses, runs=counts
+        )
         analysis_report.replace_readme_block(args.readme, block)
         print(f"updated the results block of {args.readme}")
     return 0

@@ -318,9 +318,17 @@ def readme_block(
     *,
     retest: dict[str, Any] | None = None,
     hypotheses: list[dict[str, Any]] | None = None,
+    runs: dict[str, int] | None = None,
 ) -> str:
-    """Compact results for the README; the full document is ``docs/results.md``."""
+    """Compact results for the README; the full document is ``docs/results.md``.
+
+    ``runs`` maps each run name to how many runs of it were analysed, so the block says what it
+    covers.
+    """
     out = []
+    if runs:
+        listed = ", ".join(f"`{name}` × {count}" for name, count in runs.items())
+        out += [f"Runs analysed: {listed}.", ""]
     if hypotheses:
         out += ["**Pre-registered hypotheses** (decision rule under *Experiment protocol*):", ""]
         out += [hypotheses_section(analyses, hypotheses), ""]
@@ -345,6 +353,8 @@ def readme_block(
     if retest and retest.get("reruns"):
         out += ["**Test–retest**: " + retest_section(retest).split("\n", 1)[0], ""]
         out += [retest_section(retest).split("\n", 1)[1].strip(), ""]
+    else:
+        out += ["**Test–retest**: not measured yet; it needs at least two runs of a config.", ""]
     out.append(
         "All pairwise tests, significance matrices, ANOVA tables and power: "
         "[`docs/results.md`](docs/results.md)."

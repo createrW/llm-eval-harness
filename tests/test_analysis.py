@@ -202,5 +202,7 @@ def test_readme_results_block_is_regenerated_between_markers(tmp_path):
     assert "stale numbers" not in text and text.endswith(f"{end}\n\nrest\n")
     assert "| model | zero_shot | cot |" in text and "| big | 0.800 [" in text
     assert "of 4 one-factor comparisons meet the decision rule" in text
+    assert "Runs analysed: `run` × 1." in text
+    assert "**Test–retest**: not measured yet" in text
     with pytest.raises(ValueError, match="no results markers"):
         analysis_report.replace_readme_block(tmp_path / "r.md", "x")

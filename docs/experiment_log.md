@@ -1,9 +1,12 @@
 # Experiment log
 
-Every run worth keeping, newest last (design §4): date, run name and id, config hash, device/dtype,
+Every run worth keeping, newest last (design §4): date (UTC), run name and id, config hash, device/dtype,
 headline numbers with their interval, plus wall time, GPU-hours and API cost in the notes. Reruns
 are grouped by `(config_hash, device, dtype)` (design §7.5).
 
 | date | run_name | run_id | config_hash | device/dtype | headline | notes |
 |---|---|---|---|---|---|---|
-| 2026-10-18 | smoke_qwen_hellaswag | 20261019T030343Z-42a02e07 | 42a02e07f127 | mps/float32 | acc_norm 0.52 [0.42, 0.61] | Qwen2.5-0.5B @ 060db64, HellaSwag validation @ 218ec52, n=100, zero_shot log-likelihood; acc 0.44 [0.34, 0.54]; wall time 19.5 s (run.json started→finished; 20.1 s for `make smoke`) on Apple M5; code 419b272 (clean); 0 GPU-hours, $0 API |
+| 2026-10-19 | smoke_qwen_hellaswag | 20261019T030343Z-42a02e07 | 42a02e07f127 | mps/float32 | acc_norm 0.52 [0.42, 0.61] | Qwen2.5-0.5B @ 060db64, HellaSwag validation @ 218ec52, n=100, zero_shot log-likelihood; acc 0.44 [0.34, 0.54]; wall time 19.5 s (run.json started→finished; 20.1 s for `make smoke`) on Apple M5; code 419b272 (clean); 0 GPU-hours, $0 API; committed under `data/samples/smoke/` |
+| 2026-10-23 | sample_grid | 20261023T175937Z-4adcf9c8 | — | mps/float32 | Day-2 check, n=20 per cell | Both models × both tasks × 3 variants (auto scoring), 300.8 s total. Generation throughput (generated tokens / cell time): Qwen2.5-0.5B 141–300 tok/s at batch 32 (lowest for few-shot GSM8K, ~590-token prompts), Llama-3.2-1B 40–103 tok/s at batch 16. Code 838fd72 plus uncommitted Day-2 work, so not committed as a sample. 0 GPU-hours, $0 API |
+| 2026-10-23 | local_ll | 20261023T181005Z-0bfebd23 | 0bfebd23c49f | mps/float32 | H2 supported: Llama − Qwen acc_norm +0.138 [+0.106, +0.172], exact McNemar p < 0.001 (Bonferroni, k=4) | Qwen2.5-0.5B @ 060db64 and Llama-3.2-1B @ 9535bd9 (unsloth mirror) × HellaSwag validation @ 218ec52, n=500 × zero/few-shot by log-likelihood. acc_norm: Qwen 0.494 / 0.490, Llama 0.632 / 0.636. Wall time 29.2 min (Llama few-shot alone 16.9 min). Code 7f0e384 (clean, pinned worktree). Committed under `data/samples/runs/local_ll/`. 0 GPU-hours, $0 API |
+| 2026-10-23 | local_gen | (not saved) | 9149a60630ae at batch 32 | mps/float32 | stopped, no results saved | First of three reruns started 18:39 UTC; Claude Code stopped the background job at about 20:18 UTC because the machine was critically low on memory, during Llama's HellaSwag chain-of-thought cell. A run writes its results only at the end, so nothing was saved. Cells finished before the stop (primary metric, from the log): Qwen HellaSwag-generation zero/few/cot 0.350 / 0.326 / 0.100, GSM8K zero/few/cot 0.300 / 0.387 / 0.373; Llama HellaSwag-generation zero/few 0.258 / 0.236. Llama's few-shot cell took 24.7 min (Qwen 3.4 min), a sign of swapping; the config now uses batch 16 for Llama. |
