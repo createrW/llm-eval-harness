@@ -1,0 +1,22 @@
+# The same generation grid for the API models. Needs OPENAI_API_KEY and ANTHROPIC_API_KEY; a model
+# whose key is missing fails at load and its cells are listed in run.json "failed_cells".
+# batch_size = concurrent requests. Claude models accept only default sampling, so their reruns
+# measure sampling variability (see src/llm_eval/models/api_model.py).
+run_name: api_gen
+seed: 42
+scoring: generation
+models:
+  - name: gpt-4o-mini
+    provider: openai
+    path: gpt-4o-mini
+    batch_size: 8
+  - name: claude-haiku-5.5
+    provider: anthropic
+    path: claude-haiku-5-5
+    batch_size: 8
+tasks:
+  - name: hellaswag
+    n_examples: 500
+  - name: gsm8k
+    n_examples: 300
+prompt_variants: [zero_shot, few_shot_3, cot]

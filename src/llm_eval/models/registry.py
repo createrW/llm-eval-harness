@@ -69,3 +69,17 @@ def _hf(cfg: ModelConfig, *, seed: int | None = None) -> Model:
         batch_size=cfg.batch_size,
         seed=seed,
     )
+
+
+@register_provider("openai", supports_loglikelihood=False)
+def _openai(cfg: ModelConfig, *, seed: int | None = None) -> Model:
+    from llm_eval.models.api_model import openai_model
+
+    return openai_model(cfg, seed=seed)
+
+
+@register_provider("anthropic", supports_loglikelihood=False)
+def _anthropic(cfg: ModelConfig, *, seed: int | None = None) -> Model:
+    from llm_eval.models.api_model import anthropic_model
+
+    return anthropic_model(cfg, seed=seed)
