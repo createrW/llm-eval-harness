@@ -75,6 +75,8 @@ markers = [
   "slow: downloads a real model/dataset or needs network; deselected by default (run with -m slow)",
 ]
 addopts = "-m 'not slow' --strict-markers -ra"
+# MLflow's own SQLite store uses a deprecated SQLAlchemy loader; not ours to fix
+filterwarnings = ["ignore:The ``noload`` loader strategy is deprecated:DeprecationWarning"]
 
 [tool.ruff]
 line-length = 100

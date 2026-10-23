@@ -38,3 +38,6 @@ htmlcov/
 .vscode/
 .idea/
 *.log
+
+# MLflow local store (make mlflow-ui)
+mlflow.db

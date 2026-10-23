@@ -65,6 +65,14 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--out", type=Path, metavar="PATH", help="write the markdown here")
     analyze.add_argument("--json", type=Path, metavar="PATH", help="write the tables as JSON")
     analyze.add_argument("--resamples", type=int, default=1000, metavar="B")
+
+    track = commands.add_parser("track", help="log run directories to MLflow (idempotent)")
+    track.add_argument("--runs-root", type=Path, metavar="DIR", help="log every run under DIR")
+    track.add_argument("--run-dir", type=Path, action="append", default=[], metavar="DIR")
+    track.add_argument(
+        "--analysis", type=Path, metavar="MD", help="also log this results file and its .json"
+    )
+    track.add_argument("--tracking-uri", default="sqlite:///mlflow.db", metavar="URI")
     return parser
 
 
@@ -92,7 +100,7 @@ def _report(args: argparse.Namespace) -> int:
 
 
 def _analyze(args: argparse.Namespace) -> int:
-    from llm_eval.evaluation import analysis, analysis_report
+    from llm_eval.evaluation import analysis, analysis_report, variance
 
     dirs = list(args.run_dir)
     if args.runs_root:
@@ -102,6 +110,8 @@ def _analyze(args: argparse.Namespace) -> int:
         return 2
     runs = analysis.load_runs(dirs)
     families = analysis.analyze(runs, n_resamples=args.resamples)
+    for fa in families:
+        fa.variance = variance.decompose(fa)
     retest = analysis.retest_agreement(runs, n_resamples=args.resamples)
     hypotheses = analysis_report.load_hypotheses(args.hypotheses) if args.hypotheses else None
     text = analysis_report.render(families, retest=retest, hypotheses=hypotheses)
@@ -117,6 +127,23 @@ def _analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _track(args: argparse.Namespace) -> int:
+    from llm_eval import tracking
+    from llm_eval.evaluation.analysis import discover_runs
+
+    dirs = list(args.run_dir) + (discover_runs(args.runs_root) if args.runs_root else [])
+    for run_dir in dirs:
+        run_id = tracking.log_run(run_dir, tracking_uri=args.tracking_uri)
+        print(f"{'logged' if run_id else 'already logged'}: {run_dir}")
+    if args.analysis:
+        tables = args.analysis.with_suffix(".json")
+        run_id = tracking.log_analysis(
+            args.analysis, tables, label=args.analysis.stem, tracking_uri=args.tracking_uri
+        )
+        print(f"logged analysis {args.analysis} as MLflow run {run_id}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point of ``llm-eval``; returns the process exit code."""
     logging.basicConfig(
@@ -129,6 +156,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run(args)
     if args.command == "analyze":
         return _analyze(args)
+    if args.command == "track":
+        return _track(args)
     return _report(args)
 
 

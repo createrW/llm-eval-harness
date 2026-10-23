@@ -1,4 +1,4 @@
-.PHONY: sync test test-slow lint fmt requirements smoke
+.PHONY: sync test test-slow lint fmt requirements smoke analyze mlflow mlflow-ui
 
 sync:            ## create/update .venv with every extra and the dev group
 	uv sync --all-extras --all-groups
@@ -23,3 +23,12 @@ requirements:    ## regenerate requirements*.txt from uv.lock (never edit by han
 
 smoke:           ## Day 1 smoke run: Qwen2.5-0.5B x HellaSwag x zero_shot x 100 examples
 	uv run --extra local llm-eval run --config configs/eval/smoke_qwen_hellaswag.yaml
+
+analyze:         ## results document from the committed runs (docs/results.md + .json)
+	uv run llm-eval analyze --runs-root data/samples/runs --hypotheses configs/eval/hypotheses.yaml --out docs/results.md --json docs/results.json
+
+mlflow:          ## log every committed run and the results document to the local MLflow store
+	uv run --extra tracking llm-eval track --runs-root data/samples/runs --analysis docs/results.md
+
+mlflow-ui:       ## browse the MLflow store at http://127.0.0.1:5000
+	uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
