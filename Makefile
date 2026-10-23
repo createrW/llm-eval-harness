@@ -1,4 +1,4 @@
-.PHONY: sync test test-slow lint fmt requirements smoke analyze mlflow mlflow-ui
+.PHONY: sync test test-slow lint fmt requirements smoke analyze mlflow mlflow-ui dashboard
 
 sync:            ## create/update .venv with every extra and the dev group
 	uv sync --all-extras --all-groups
@@ -32,3 +32,6 @@ mlflow:          ## log every committed run and the results document to the loca
 
 mlflow-ui:       ## browse the MLflow store at http://127.0.0.1:5000
 	uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
+
+dashboard:       ## Streamlit dashboard over data/samples/runs at http://localhost:8501
+	uv run --extra dashboard streamlit run src/llm_eval/serving/app.py
