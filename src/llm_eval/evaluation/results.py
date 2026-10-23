@@ -106,6 +106,8 @@ def write_run(run_dir: Path, frame: pd.DataFrame, metadata: dict[str, Any]) -> N
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     table = pa.Table.from_pandas(frame, schema=RESULTS_SCHEMA, preserve_index=False)
+    # pandas metadata from ArrowDtype frames breaks plain pd.read_parquet; the schema suffices
+    table = table.replace_schema_metadata(None)
     pq.write_table(table, run_dir / EXAMPLES_FILE, compression="zstd")
     with (run_dir / RUN_FILE).open("w", encoding="utf-8") as fh:
         json.dump(metadata, fh, indent=2, sort_keys=True, default=str)

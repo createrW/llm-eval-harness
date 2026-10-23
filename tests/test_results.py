@@ -132,3 +132,11 @@ def test_read_run_returns_arrow_dtypes_and_python_list_cells(tmp_path):
     cell = back["choice_logprobs"].iloc[0]
     assert type(cell) is list and cell == [-1.0, -2.0]
     assert back["exemplar_ids"].iloc[0] == ["a", "b"]
+
+
+def test_plain_pandas_reads_examples_parquet(tmp_path):
+    write_run(tmp_path / "run", records_to_frame([record(0), record(1)]), {"run_id": "r"})
+    frame = pd.read_parquet(tmp_path / "run" / "examples.parquet")
+    assert list(frame.columns) == COLUMNS
+    assert list(frame["choice_logprobs"].iloc[0]) == [-1.0, -2.0]
+    assert pq.read_schema(tmp_path / "run" / "examples.parquet").metadata is None
