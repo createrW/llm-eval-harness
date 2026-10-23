@@ -74,11 +74,25 @@ def load_runs(run_dirs: Iterable[Path]) -> list[Run]:
     return runs
 
 
+def hardware(run: Run) -> tuple[tuple[str, str, str], ...]:
+    """``(model, device, dtype)`` of every model of a run."""
+    models = run.meta.get("models") or {}
+    return tuple(
+        sorted(
+            (name, str(info.get("device")), str(info.get("dtype"))) for name, info in models.items()
+        )
+    )
+
+
 def rerun_groups(runs: Sequence[Run]) -> list[list[Run]]:
-    """Runs grouped by config hash, each group ordered by start time; groups in first-seen order."""
-    groups: dict[str, list[Run]] = {}
+    """Reruns: runs grouped by config hash *and* hardware (design §7.5), ordered by start time.
+
+    Runs of one config on different devices or dtypes are separate groups, so device differences
+    never count as rerun disagreement.
+    """
+    groups: dict[tuple[str, tuple[tuple[str, str, str], ...]], list[Run]] = {}
     for run in runs:
-        groups.setdefault(run.config_hash, []).append(run)
+        groups.setdefault((run.config_hash, hardware(run)), []).append(run)
     return [sorted(g, key=lambda r: str(r.meta["started_at"])) for g in groups.values()]
 
 
@@ -362,6 +376,15 @@ def _decide(c: Comparison, mde: float) -> None:
 def analyze(runs: Sequence[Run], *, n_resamples: int = 1000) -> list[FamilyAnalysis]:
     """One :class:`FamilyAnalysis` per (task, scoring), from the first run of each config."""
     reference = [group[0] for group in rerun_groups(runs)]
+    seen: dict[str, Run] = {}
+    for run in reference:
+        if run.config_hash in seen:
+            devices = sorted({str(hardware(r)) for r in (seen[run.config_hash], run)})
+            raise ValueError(
+                f"config {run.config_hash} was run on different hardware {devices}; keep one"
+                " hardware set per config under the runs root (design §7.5)"
+            )
+        seen[run.config_hash] = run
     return _analyze_runs(reference, n_resamples=n_resamples)
 
 

@@ -206,3 +206,23 @@ def test_readme_results_block_is_regenerated_between_markers(tmp_path):
     assert "**Test–retest**: not measured yet" in text
     with pytest.raises(ValueError, match="no results markers"):
         analysis_report.replace_readme_block(tmp_path / "r.md", "x")
+
+
+def test_reruns_are_grouped_by_config_and_hardware(tmp_path):
+    import json
+
+    dirs = [
+        make_run(tmp_path, name, OUTCOMES, started=f"2026-10-23T0{i}:00:00")
+        for i, name in enumerate(["mps1", "cuda1", "cuda2"])
+    ]
+    for d, device in zip(dirs, ["mps", "cuda", "cuda"], strict=True):
+        meta = json.loads((d / "run.json").read_text())
+        meta["models"] = {m: {"device": device, "dtype": "float32"} for m in ("big", "small")}
+        (d / "run.json").write_text(json.dumps(meta))
+    runs = analysis.load_runs(dirs)
+    assert [len(g) for g in analysis.rerun_groups(runs)] == [1, 2]
+    assert analysis.retest_agreement(runs)["reruns"] == 2
+    with pytest.raises(ValueError, match="different hardware"):
+        analysis.analyze(runs)
+    [fa] = analysis.analyze(runs[1:])
+    assert fa.cells["n_ok"].tolist() == [N] * 4

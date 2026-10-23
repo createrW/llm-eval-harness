@@ -20,6 +20,7 @@ fmt:
 requirements:    ## regenerate requirements*.txt from uv.lock (never edit by hand)
 	uv export --frozen --no-dev --no-hashes --extra dashboard -o requirements.txt
 	uv export --frozen --no-dev --no-hashes --extra local --extra report --emit-index-url -o requirements-local.txt
+	uv export --frozen --no-dev --no-hashes --extra local --no-emit-project --no-emit-package torch -o requirements-cuda.txt
 
 smoke:           ## Day 1 smoke run: Qwen2.5-0.5B x HellaSwag x zero_shot x 100 examples
 	uv run --extra local llm-eval run --config configs/eval/smoke_qwen_hellaswag.yaml

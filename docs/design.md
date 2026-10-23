@@ -832,7 +832,11 @@ code and this section win.
   plan on Streamlit Community Cloud from `requirements.txt` (torch-free).
 - **Runs** were made from a git worktree pinned to the commit that produced them, so code edits
   during the hours-long reruns could not leak into later runs; the Day-1 smoke run moved to
-  `data/samples/smoke/`.
+  `data/samples/smoke/`. A background grid on the 16 GB laptop was stopped for low memory, so the
+  grid can also run on a cloud GPU: `scripts/modal_eval.py` (Modal; every finished run is saved to
+  a volume at once) or `scripts/cloud_gpu_run.sh` (any SSH GPU machine). Reruns are grouped by
+  config hash *and* hardware, as §7.5 specifies, and an analysis that mixes hardware for one
+  config is rejected.
 
 ### Backlog (deferred under "only what is necessary")
 
