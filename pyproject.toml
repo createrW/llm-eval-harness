@@ -59,8 +59,8 @@ build-backend = "hatchling.build"
 packages = ["src/llm_eval"]
 
 # CPU-only torch wheels on Linux keep CI and the Docker image small (the PyPI wheel drags ~3 GB of
-# CUDA libraries). macOS keeps the default PyPI wheel (MPS). On a CUDA box, after `uv sync --extra local` run:
-#   uv pip install --torch-backend=auto torch   # then use the activated .venv (not `uv run`)
+# CUDA libraries). macOS keeps the default PyPI wheel (MPS). For a CUDA box see the README section
+# "Optional: a rented GPU" (the swap needs --reinstall-package torch and UV_NO_SYNC=1).
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"

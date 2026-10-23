@@ -1,5 +1,11 @@
 # Renting GPUs and hosting for llm-eval-harness: decision memo (2026-10-18)
 
+> **Superseded for deployment (2026-10-23).** Deployment follows the author's hosting plan: the
+> evaluations run locally and the dashboard runs on Streamlit Community Cloud ($0). The full local
+> grid ran on an Apple M5 laptop. This memo stays as the price reference for an optional rented
+> GPU; its setup commands that use plain `uv sync` install the CPU wheel on Linux, so follow the
+> README section "Optional: a rented GPU" instead.
+
 **Scope.** This memo covers renting compute for an inference-only eval grid and hosting an always-on Streamlit + MLflow box, on a $0-15 budget. The grid:
 - Models: Qwen2.5-0.5B and Llama-3.2-1B.
 - HellaSwag: 500 items × 4 endings × 3 prompts.
