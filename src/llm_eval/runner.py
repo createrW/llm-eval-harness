@@ -19,6 +19,7 @@ import os
 import platform
 import subprocess
 import sys
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -215,6 +216,7 @@ def run_config(
     exemplar_seed = cfg.exemplar_seed if cfg.exemplar_seed is not None else cfg.seed
 
     grid = expand_grid(cfg)
+    logger.info("run %s: %d cells -> %s", run_id, len(grid), run_dir)
     tasks: dict[str, Task] = {}
     examples: dict[str, list[Example]] = {}
     for tcfg in cfg.tasks:
@@ -222,6 +224,15 @@ def run_config(
         n = tcfg.n_examples if tcfg.n_examples is not None else cfg.n_examples
         examples[tcfg.name] = task.load(tcfg.split or task.default_split, n, cfg.seed)
         tasks[tcfg.name] = task
+        info = task.dataset_info()
+        logger.info(
+            "task %s/%s: %d of %d rows @ %s",
+            tcfg.name,
+            info["split"],
+            len(examples[tcfg.name]),
+            info["n_rows"],
+            str(info["revision"])[:7],
+        )
 
     records: list[ExampleRecord] = []
     failed_cells: list[str] = []
@@ -238,11 +249,22 @@ def run_config(
             progress.update(len(cells))
             continue
         models_info[mcfg.name] = {"provider": mcfg.provider, "path": mcfg.path, **model.info()}
+        resolved = model.info()
+        logger.info(
+            "model %s: device=%s dtype=%s revision=%s",
+            mcfg.name,
+            resolved["device"],
+            resolved["dtype"],
+            resolved["revision"],
+        )
+        if mcfg.device == "auto" and resolved["device"] == "cpu":
+            logger.warning("model %s: device auto resolved to cpu; expect a slow run", mcfg.name)
         for cell in cells:
             name = _cell_name(cell.model.name, cell.task.name, cell.variant)
             progress.set_description(name)
+            started = time.perf_counter()
             try:
-                records += evaluate_cell(
+                cell_records = evaluate_cell(
                     model,
                     tasks[cell.task.name],
                     examples[cell.task.name],
@@ -255,6 +277,17 @@ def run_config(
             except Exception:
                 logger.exception("cell %s failed", name)
                 failed_cells.append(name)
+            else:
+                records += cell_records
+                n_ok = sum(r.status == "ok" for r in cell_records)
+                n_right = sum(bool(r.primary_correct) for r in cell_records)
+                logger.info(
+                    "cell %s: %d examples, primary %.3f, %.1f s",
+                    name,
+                    len(cell_records),
+                    n_right / max(n_ok, 1),
+                    time.perf_counter() - started,
+                )
             progress.update(1)
         del model
         _release_model()
@@ -285,4 +318,5 @@ def run_config(
         ],
     }
     write_run(run_dir, frame, metadata)
+    logger.info("run %s written to %s", run_id, run_dir)
     return RunResult(run_dir=run_dir, summary=summary, failed_cells=failed_cells)

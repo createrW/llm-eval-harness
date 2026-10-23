@@ -202,3 +202,13 @@ def test_library_versions_reports_installed_packages():
     assert (
         v["python"].startswith("3.11") and "torch" in v and "transformers" in v and "llm_eval" in v
     )
+
+
+def test_run_config_logs_progress_per_model_and_cell(tmp_path, caplog):
+    caplog.set_level("INFO", logger="llm_eval")
+    run_config(EvalConfig(**CFG), project_root=tmp_path, now=NOW)
+    messages = [r.getMessage() for r in caplog.records if r.name == "llm_eval"]
+    assert any(m.startswith("model fake-a: device=cpu") for m in messages)
+    assert any(
+        m.startswith("cell fake-a×hellaswag_offline×zero_shot: 4 examples") for m in messages
+    )
