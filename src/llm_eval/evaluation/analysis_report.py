@@ -189,13 +189,14 @@ def hypotheses_section(analyses: Sequence[FamilyAnalysis], hypotheses: list[dict
             {
                 "id": h["id"],
                 "claim": h["claim"],
-                "n": c.n,
+                "n": str(c.n),
                 "Δ [95% CI]": signed_interval(diff, lo, hi),
                 "McNemar exact p (Bonf.)": pval(c.mcnemar_bonf),
                 "result": result,
             }
         )
-    return to_markdown(pd.DataFrame(rows))
+    columns = ["id", "claim", "n", "Δ [95% CI]", "McNemar exact p (Bonf.)", "result"]
+    return to_markdown(pd.DataFrame(rows, columns=columns).fillna(""))
 
 
 def retest_section(retest: dict[str, Any]) -> str:
