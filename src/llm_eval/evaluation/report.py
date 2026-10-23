@@ -44,7 +44,8 @@ SUMMARY_COLUMNS = [
     "n_resamples",
     "ci_seed",
 ]
-FORMAT_COLUMNS = ["model", "task", "prompt_variant", "metric", "n", "acc", "acc_norm"]
+# n_ok is the n behind every interval (status == "ok" rows); n_error counts failed requests
+FORMAT_COLUMNS = ["model", "task", "prompt_variant", "metric", "n_ok", "n_error", "acc", "acc_norm"]
 
 
 def _estimate(values: pd.Series, idx: np.ndarray | None) -> tuple[Any, Any, Any]:

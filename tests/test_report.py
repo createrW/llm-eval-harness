@@ -95,5 +95,7 @@ def test_to_markdown_exact():
 
 def test_format_summary_renders_interval_strings():
     out = format_summary(summarize(two_cells(), seed=42, n_resamples=200))
-    assert out.startswith("| model | task | prompt_variant | metric | n | acc | acc_norm |")
-    assert "| m1 | hellaswag | zero_shot | acc_norm | 10 | 0.700 [" in out
+    assert out.startswith(
+        "| model | task | prompt_variant | metric | n_ok | n_error | acc | acc_norm |"
+    )
+    assert "| m1 | hellaswag | zero_shot | acc_norm | 10 | 0 | 0.700 [" in out

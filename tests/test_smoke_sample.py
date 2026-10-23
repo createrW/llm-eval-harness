@@ -48,4 +48,6 @@ def test_smoke_sample_summary_is_reproducible_from_its_examples(smoke_run_dir):
 
 def test_cli_report_prints_the_smoke_sample_row(smoke_run_dir, capsys):
     assert main(["report", "--run-dir", str(smoke_run_dir)]) == 0
-    assert "| qwen2.5-0.5b | hellaswag | zero_shot | acc_norm | 100 |" in capsys.readouterr().out
+    assert (
+        "| qwen2.5-0.5b | hellaswag | zero_shot | acc_norm | 100 | 0 |" in capsys.readouterr().out
+    )

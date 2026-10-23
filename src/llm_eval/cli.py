@@ -51,6 +51,20 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument(
         "--run-dir", required=True, type=Path, metavar="DIR", help="a run directory"
     )
+
+    analyze = commands.add_parser(
+        "analyze", help="cross-cell tables, paired tests, verdicts and test-retest over runs"
+    )
+    analyze.add_argument(
+        "--runs-root", type=Path, metavar="DIR", help="analyse every <DIR>/<run_name>/<run_id>/"
+    )
+    analyze.add_argument(
+        "--run-dir", type=Path, action="append", default=[], metavar="DIR", help="a run (repeat)"
+    )
+    analyze.add_argument("--hypotheses", type=Path, metavar="PATH", help="hypotheses YAML")
+    analyze.add_argument("--out", type=Path, metavar="PATH", help="write the markdown here")
+    analyze.add_argument("--json", type=Path, metavar="PATH", help="write the tables as JSON")
+    analyze.add_argument("--resamples", type=int, default=1000, metavar="B")
     return parser
 
 
@@ -77,6 +91,32 @@ def _report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _analyze(args: argparse.Namespace) -> int:
+    from llm_eval.evaluation import analysis, analysis_report
+
+    dirs = list(args.run_dir)
+    if args.runs_root:
+        dirs += analysis.discover_runs(args.runs_root)
+    if not dirs:
+        logger.error("no runs: pass --runs-root or --run-dir")
+        return 2
+    runs = analysis.load_runs(dirs)
+    families = analysis.analyze(runs, n_resamples=args.resamples)
+    retest = analysis.retest_agreement(runs, n_resamples=args.resamples)
+    hypotheses = analysis_report.load_hypotheses(args.hypotheses) if args.hypotheses else None
+    text = analysis_report.render(families, retest=retest, hypotheses=hypotheses)
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
+        print(f"wrote {args.out}")
+    else:
+        print(text)
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(analysis.to_json(families, retest), encoding="utf-8")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point of ``llm-eval``; returns the process exit code."""
     logging.basicConfig(
@@ -87,6 +127,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "run":
         return _run(args)
+    if args.command == "analyze":
+        return _analyze(args)
     return _report(args)
 
 
