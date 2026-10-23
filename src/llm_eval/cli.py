@@ -64,6 +64,9 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--hypotheses", type=Path, metavar="PATH", help="hypotheses YAML")
     analyze.add_argument("--out", type=Path, metavar="PATH", help="write the markdown here")
     analyze.add_argument("--json", type=Path, metavar="PATH", help="write the tables as JSON")
+    analyze.add_argument(
+        "--readme", type=Path, metavar="PATH", help="rewrite the results block of this README"
+    )
     analyze.add_argument("--resamples", type=int, default=1000, metavar="B")
 
     track = commands.add_parser("track", help="log run directories to MLflow (idempotent)")
@@ -124,6 +127,10 @@ def _analyze(args: argparse.Namespace) -> int:
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(analysis.to_json(families, retest), encoding="utf-8")
+    if args.readme:
+        block = analysis_report.readme_block(families, retest=retest, hypotheses=hypotheses)
+        analysis_report.replace_readme_block(args.readme, block)
+        print(f"updated the results block of {args.readme}")
     return 0
 
 

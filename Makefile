@@ -25,7 +25,7 @@ smoke:           ## Day 1 smoke run: Qwen2.5-0.5B x HellaSwag x zero_shot x 100 
 	uv run --extra local llm-eval run --config configs/eval/smoke_qwen_hellaswag.yaml
 
 analyze:         ## results document from the committed runs (docs/results.md + .json)
-	uv run llm-eval analyze --runs-root data/samples/runs --hypotheses configs/eval/hypotheses.yaml --out docs/results.md --json docs/results.json
+	uv run llm-eval analyze --runs-root data/samples/runs --hypotheses configs/eval/hypotheses.yaml --out docs/results.md --json docs/results.json --readme README.md
 
 mlflow:          ## log every committed run and the results document to the local MLflow store
 	uv run --extra tracking llm-eval track --runs-root data/samples/runs --analysis docs/results.md

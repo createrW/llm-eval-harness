@@ -175,3 +175,32 @@ def test_significance_matrix_marks_exploratory_pairs(tmp_path):
     assert rows[0].startswith("|  | big · zero_shot | big · cot | small · zero_shot")
     assert "★" in rows[2]  # big · zero_shot beats small · zero_shot
     assert [cell.strip() for cell in rows[2].split("|")].count("·") == 1
+
+
+def test_readme_results_block_is_regenerated_between_markers(tmp_path):
+    make_run(tmp_path / "runs", "run", OUTCOMES)
+    readme = tmp_path / "README.md"
+    start, end = analysis_report.README_START, analysis_report.README_END
+    readme.write_text(f"# t\n\n{start}\nstale numbers\n{end}\n\nrest\n")
+    assert (
+        main(
+            [
+                "analyze",
+                "--runs-root",
+                str(tmp_path / "runs"),
+                "--readme",
+                str(readme),
+                "--out",
+                str(tmp_path / "r.md"),
+                "--resamples",
+                "50",
+            ]
+        )
+        == 0
+    )
+    text = readme.read_text()
+    assert "stale numbers" not in text and text.endswith(f"{end}\n\nrest\n")
+    assert "| model | zero_shot | cot |" in text and "| big | 0.800 [" in text
+    assert "of 4 one-factor comparisons meet the decision rule" in text
+    with pytest.raises(ValueError, match="no results markers"):
+        analysis_report.replace_readme_block(tmp_path / "r.md", "x")

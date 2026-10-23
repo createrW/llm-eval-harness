@@ -677,7 +677,7 @@ ci_method="percentile_bootstrap", n_resamples, ci_seed}` (`acc_norm*` null outsi
 
 ### 8.3 Samples policy
 
-- Day 1 commits `data/samples/runs/smoke_qwen_hellaswag/<run_id>/` (one cell, n=100, < 200 KB). It
+- Day 1 commits `data/samples/smoke/smoke_qwen_hellaswag/<run_id>/` (one cell, n=100, < 200 KB; moved out of `runs/` on Day 7 so it does not overlap the full grid). It
   serves the results-schema, parquet round-trip, report-table and CLI tests.
 - Day 2 commits a real `data/samples/runs/sample_grid/<run_id>/` (Qwen2.5-0.5B + Llama-3.2-1B ×
   HellaSwag × 3 variants × n=100, ≈600 rows, < 2 MB) for the dashboard demo, the report smoke tests
@@ -790,3 +790,56 @@ by a small script is fine).
 | Streamlit Cloud 1 GB RAM / install size | torch is a `local` extra; `requirements.txt` has no torch; `serving/` imports only `evaluation.*` (tested) |
 | n too small for claims | CIs always shown; README reports the MDE per comparison and labels sub-MDE differences "underpowered — no conclusion" |
 | API nondeterminism at temperature 0 | reported separately in the test–retest numbers; never pooled with local determinism |
+
+## 15. As built, Days 2–7 (2026-10-23)
+
+Days 2–7 were built efficiency-first against the brief; where the result differs from §1–14, the
+code and this section win.
+
+- **Scope re-aligned to the brief.** Kept: the two HellaSwag analyses (§7.3), McNemar exact as the
+  verdict test with Wilcoxon reported (§7.6–7.7, pre-registered), one-factor comparison family,
+  per-example exemplar draws, test–retest over three same-seed reruns. Dropped: rank
+  probabilities and the generated leaderboard sentence, the forest plot and the matplotlib
+  `report` extra's use, exemplar-seed stability runs (one exemplar seed), the
+  `hellaswag_prompt_effects.yaml` name (its role is `configs/eval/local_gen.yaml`).
+- **Configs.** `local_ll.yaml` (HellaSwag × zero/few-shot by log-likelihood),
+  `local_gen.yaml` (both tasks × all three variants by generation), `api_gen.yaml` (the same grid
+  for GPT-4o-mini and Claude Haiku 5.5), `sample_grid.yaml` (20-example check), `hypotheses.yaml`.
+  Llama-3.2-1B comes from the ungated `unsloth/Llama-3.2-1B` mirror at a pinned revision.
+- **Prompts** (§7.3) carry a one-line instruction (e.g. `Reply with one letter.`,
+  `finish with "The answer is N."`) so one text works as a completion prompt for base models and
+  as a user message for chat models; lettered blocks start with `Context:`. Generation budgets
+  are 8 tokens for a multiple-choice letter and 256 otherwise (§7.2's 512 for CoT was cut after
+  the 20-example benchmark); stop strings per (task type, variant), with few-shot GSM8K stopping at
+  the blank line between exemplars.
+- **GSM8K extraction** takes the *first* "answer is N" (base models keep writing after their
+  answer), else the last number (§7.2 said the last "answer is").
+- **Generation** (`HFCausalLM.generate`): left-padded, length-sorted batches, an explicit greedy
+  `GenerationConfig` with neutral temperature/top-p so checkpoint sampling defaults (Llama's
+  `do_sample: true`) never apply. Log-likelihood batches are capped at 1 GiB of fp32 logits.
+- **API adapters** (`models/api_model.py`): one user message per prompt, concurrent requests,
+  SDK retries, failures as `status="error"` rows. OpenAI: temperature 0 and a seed. Claude models
+  accept only default sampling (and API version 2026-10-21 rejects sampling parameters on every
+  model), so Anthropic calls send none and disable thinking; their reruns measure sampling noise.
+- **Analysis** (`evaluation/analysis.py`, `analysis_report.py`, `variance.py`): as §7.6–7.7, with
+  the minimum detectable effect computed at the observed discordance rate; test–retest reports
+  agreement and conclusion stability (exemplar-resampling stability dropped with the exemplar-seed
+  runs). `llm-eval analyze` writes `docs/results.md`, `docs/results.json` and the README block.
+- **MLflow** (`tracking.py`): a local SQLite store, one MLflow run per run directory plus one for
+  the analysis; `make mlflow`, `make mlflow-ui`.
+- **Dashboard** (`serving/app.py` over `serving/dashboard.py`): a selectable cell table; two
+  selected rows give the paired comparison and the disagreeing examples. Deployed per the hosting
+  plan on Streamlit Community Cloud from `requirements.txt` (torch-free).
+- **Runs** were made from a git worktree pinned to the commit that produced them, so code edits
+  during the hours-long reruns could not leak into later runs; the Day-1 smoke run moved to
+  `data/samples/smoke/`.
+
+### Backlog (deferred under "only what is necessary")
+
+From the Day-1 whole-branch review, not done: `SetupError`/exit code 2 for config errors; git
+provenance read from the imported package's repository and at run start (runs here came from a
+pinned worktree, which makes both correct in practice); an atomic run-directory claim; NaN
+log-prob rejection; offline dataset-revision verification; a whitespace-faithful tokenizer fixture;
+an exact test of the 95% level; README/api_spec sync tests; mypy in CI (one error at
+`hf_model.py`); per-model-group persistence for long runs. Also: two-stage chain-of-thought
+(reason, then extract) for base models, and exemplar-seed stability runs.

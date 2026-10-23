@@ -11,7 +11,7 @@ from llm_eval.cli import main
 from llm_eval.evaluation.report import summarize
 from llm_eval.evaluation.results import EXAMPLES_FILE, RESULTS_SCHEMA, read_run
 
-SAMPLE_ROOT = Path(__file__).resolve().parents[1] / "data" / "samples" / "runs"
+SAMPLE_ROOT = Path(__file__).resolve().parents[1] / "data" / "samples" / "smoke"
 
 
 @pytest.fixture(scope="module")

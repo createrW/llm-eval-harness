@@ -12,9 +12,13 @@ uv run python -c "import json; from llm_eval.config import EvalConfig; print(jso
 argparse, installed as the `llm-eval` console script (`llm_eval.cli:main`).
 
 ```
-llm-eval run    --config configs/eval/smoke_qwen_hellaswag.yaml [--output-dir …] [--n-examples N] [--seed S] [--allow-errors]
-llm-eval report --run-dir data/processed/runs/smoke_qwen_hellaswag/<run_id>      # markdown tables to stdout
-scripts/eval.sh configs/eval/smoke_qwen_hellaswag.yaml                            # == uv run --extra local llm-eval run --config …
+llm-eval run     --config configs/eval/local_gen.yaml [--output-dir …] [--n-examples N] [--seed S] [--allow-errors]
+llm-eval report  --run-dir data/processed/runs/local_gen/<run_id>                 # one run's summary table
+llm-eval analyze --runs-root data/samples/runs [--run-dir DIR …] [--hypotheses configs/eval/hypotheses.yaml]
+                 [--out docs/results.md] [--json docs/results.json] [--readme README.md] [--resamples B]
+llm-eval track   --runs-root data/samples/runs [--run-dir DIR …] [--analysis docs/results.md] [--tracking-uri URI]
+scripts/eval.sh configs/eval/smoke_qwen_hellaswag.yaml        # == uv run --extra local llm-eval run --config …
+scripts/run_grid.sh 3 configs/eval/local_ll.yaml configs/eval/local_gen.yaml   # each config 3 times, same seed
 ```
 
 `llm-eval run`
@@ -30,7 +34,8 @@ scripts/eval.sh configs/eval/smoke_qwen_hellaswag.yaml                          
 Overrides are applied before validation, so `config_hash` and `run.json["config"]` reflect them.
 The project root is the nearest ancestor of the working directory that contains `pyproject.toml`,
 else the working directory itself. `run` prints `run dir: <absolute path>` and then the summary
-table (`acc` / `acc_norm` as `0.560 [0.470, 0.650]`, with `n`) on stdout; logs go to stderr at INFO.
+table (`acc` / `acc_norm` as `0.560 [0.470, 0.650]`, with `n_ok`, the n behind each interval, and
+`n_error`) on stdout; logs go to stderr at INFO, one line per task, model and cell.
 
 Exit codes: `0` success; `1` when any cell raised (`run.json["failed_cells"]` is non-empty) or,
 without `--allow-errors`, when any example row has `status == "error"`; `2` on argparse usage
@@ -44,12 +49,33 @@ errors. Completed cells are written either way.
 
 Prints the summary table stored in `run.json["summary"]`; exit code `0`.
 
+`llm-eval analyze` loads the runs (the earliest run of each `config_hash` is the reference; later
+runs of the same config are reruns), groups cells into families `(task, scoring)` and writes the
+results document: hypotheses (from `--hypotheses`), per family the cell / per-model / per-prompt
+tables with bootstrap CIs, every one-factor pairwise comparison (paired bootstrap CI of the
+difference, Wilcoxon p, exact McNemar p, Bonferroni and Holm, verdict, flags), the significance
+matrix, power (minimum detectable difference) and the variance decomposition, then test–retest
+agreement and conclusion stability across reruns. `--json` writes the same tables as JSON;
+`--readme` rewrites the block between the results markers of a README. Runs that share a cell
+(same model, task, variant and scoring) under different configs are rejected.
+
+`llm-eval track` logs each run directory to MLflow once (experiment `llm-eval-harness`; default
+store `sqlite:///mlflow.db` with artifacts under `mlruns/`) and, with `--analysis`, the results
+document and its `.json` as one more MLflow run.
+
 ## Config schema
 
-Pydantic v2, `extra="forbid"` on every model (`additionalProperties: false`). Validation beyond
-the schema: unique model names, `provider ∈ PROVIDERS`, task `name ∈ TASKS`, unique
-`prompt_variants`, and the per-cell rejections of design §7.4 (raised by `expand_grid` before any
-model loads). A task's `split: null` is filled with the task's default split.
+Pydantic v2, `extra="forbid"` on every model (`additionalProperties: false`). Field bounds are in
+the schema (seeds in `[0, 2^63 − 1]`, `run_name` one path component, non-empty `models`, `tasks`
+and `prompt_variants`, `n_examples ≥ 1`, `max_new_tokens ≥ 1`). Validation beyond the schema:
+unique model names, unique task names (one split per task per run), `provider ∈ PROVIDERS`
+(`hf`, `openai`, `anthropic`), task `name ∈ TASKS` (`hellaswag`, `gsm8k`), unique
+`prompt_variants`, and the per-cell rejections of design §7.4 (chain-of-thought or a free-text
+task under `scoring: loglikelihood`, or log-likelihood on a provider without it), raised by
+`expand_grid` before any model loads. A task's `split: null` is filled with the task's default
+split. For API providers `path` is the API model id and `batch_size` the number of concurrent
+requests; `max_new_tokens`, when set, replaces the per-variant generation budget (8 tokens for a
+multiple-choice letter, 256 otherwise).
 
 ```json
 {
@@ -113,6 +139,7 @@ model loads). A task's `split: null` is filled with the task's default split.
         "max_new_tokens": {
           "anyOf": [
             {
+              "minimum": 1,
               "type": "integer"
             },
             {
@@ -195,17 +222,22 @@ model loads). A task's `split: null` is filled with the task's default split.
   "description": "A full evaluation run: models \u00d7 tasks \u00d7 prompt variants (design \u00a78.1).",
   "properties": {
     "run_name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
       "title": "Run Name",
       "type": "string"
     },
     "seed": {
       "default": 42,
+      "maximum": 9223372036854775807,
+      "minimum": 0,
       "title": "Seed",
       "type": "integer"
     },
     "exemplar_seed": {
       "anyOf": [
         {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
           "type": "integer"
         },
         {
@@ -249,6 +281,7 @@ model loads). A task's `split: null` is filled with the task's default split.
       "items": {
         "$ref": "#/$defs/ModelConfig"
       },
+      "minItems": 1,
       "title": "Models",
       "type": "array"
     },
@@ -256,6 +289,7 @@ model loads). A task's `split: null` is filled with the task's default split.
       "items": {
         "$ref": "#/$defs/TaskConfig"
       },
+      "minItems": 1,
       "title": "Tasks",
       "type": "array"
     },
@@ -291,7 +325,7 @@ scoring: auto                       # auto | loglikelihood | generation (resolve
 bootstrap_resamples: 1000
 models:
   - name: qwen2.5-0.5b              # short id used in results; unique within a config
-    provider: hf                    # must be a key of PROVIDERS (hf; Day 3: openai, anthropic)
+    provider: hf                    # must be a key of PROVIDERS: hf, openai, anthropic
     path: Qwen/Qwen2.5-0.5B
     revision: null                  # optional HF commit pin; the resolved commit is always recorded
     dtype: auto                     # auto (= float32) | float32 | float16 | bfloat16
@@ -351,13 +385,13 @@ Provenance (design §7.5) plus the per-cell summary (§8.2):
 | `schema_version` | `1` |
 | `run_id` | the run directory name |
 | `run_name` | `EvalConfig.run_name` |
-| `config` | the post-override config, exactly as hashed (`EvalConfig.model_dump(mode="json")`) |
-| `config_hash` | first 12 hex of the sha256 of the canonical JSON config, `output_dir` excluded |
+| `config` | the post-override config, `EvalConfig.model_dump(mode="json")` in full (`output_dir` included; the hash leaves it out) |
+| `config_hash` | first 12 hex of the sha256 of `json.dumps(config without output_dir, sort_keys=True, separators=(",", ":"))` |
 | `started_at`, `finished_at` | ISO-8601 UTC timestamps |
 | `git_sha`, `git_dirty` | from `git rev-parse HEAD` / `git status --porcelain`; env `LLM_EVAL_GIT_SHA` wins (then `git_dirty` is null); null when neither is available |
 | `library_versions` | python, llm_eval, numpy, pandas, pyarrow, scipy, statsmodels, pydantic, and when installed torch, transformers, tokenizers, datasets, huggingface_hub |
-| `models` | per model name: `{provider, path, revision, dtype, device}`, resolved (`revision` = the 40-hex snapshot commit, null for an injected model) |
-| `tasks` | per task name: `{path, revision, split, n_rows, example_ids}` (`example_ids` in subset order) |
+| `models` | per model name: `{provider, path, revision, dtype, device}`, resolved after the model's cells ran (`revision` = the 40-hex snapshot commit for `hf`, the model version(s) the API reported serving for `openai`/`anthropic`; `device` = `api` for those) |
+| `tasks` | per task name: `{path, revision, split, n_rows, example_ids}` plus `config` when the dataset has one (GSM8K: `main`); `example_ids` in subset order |
 | `failed_cells` | `"model×task×variant"` names of the cells that raised |
 | `summary` | one entry per cell, fields below |
 
@@ -375,13 +409,28 @@ generation mode).
 def run_config(cfg: EvalConfig, *, project_root: Path | None = None, now: datetime | None = None) -> RunResult
     # project_root=None → nearest ancestor of cwd containing pyproject.toml, else cwd. Relative output_dir resolves against it.
 def evaluate_cell(model: Model, task: Task, examples: Sequence[Example], variant: PromptVariant, scoring: ScoringMode,
-                  *, run_id: str, seed: int, exemplar_seed: int | None = None) -> list[ExampleRecord]
+                  *, run_id: str, seed: int, exemplar_seed: int | None = None,
+                  max_new_tokens: int | None = None) -> list[ExampleRecord]
 
 # src/llm_eval/evaluation/results.py
 def read_run(run_dir: Path) -> tuple[pd.DataFrame, dict]   # (ArrowDtype frame of examples.parquet, run.json)
 
 # src/llm_eval/evaluation/report.py
 def summarize(frame: pd.DataFrame, *, seed: int, n_resamples: int = 1000) -> pd.DataFrame   # one row per cell, the summary fields above
+
+# src/llm_eval/evaluation/analysis.py
+def discover_runs(root: Path) -> list[Path]                      # every <root>/<run_name>/<run_id>/ with a run.json
+def load_runs(run_dirs: Iterable[Path]) -> list[Run]
+def analyze(runs: Sequence[Run], *, n_resamples: int = 1000) -> list[FamilyAnalysis]   # one per (task, scoring)
+def retest_agreement(runs: Sequence[Run], *, n_resamples: int = 1000) -> dict          # agreement + conclusion stability
+
+# src/llm_eval/evaluation/variance.py
+def decompose(fa: FamilyAnalysis, *, anova: bool = True) -> dict   # cell-mean shares with CIs; per-example ANOVA
+
+# src/llm_eval/evaluation/stats.py
+def paired_tests(a, b) -> dict             # n10, n01, wilcoxon_p, mcnemar_p (exact)
+def adjust_pvalues(pvalues, method) -> list[float]                 # "bonferroni" | "holm"
+def minimum_detectable_effect(n, discordance, *, alpha=0.05, power=0.8) -> float
 ```
 
 Minimal use:
