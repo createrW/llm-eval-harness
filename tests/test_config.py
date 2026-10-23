@@ -55,6 +55,15 @@ def test_smoke_config_loads_with_documented_values():
         (lambda d: d.update(prompt_variants=["zero_shot", "zero_shot"]), "unique"),
         (lambda d: d["models"][0].update(dtype="int8"), "dtype"),
         (lambda d: d["tasks"][0].update(n_examples=0), "n_examples"),
+        (lambda d: d.update(seed=-1), "seed"),
+        (lambda d: d.update(seed=2**63), "seed"),
+        (lambda d: d.update(exemplar_seed=-1), "exemplar_seed"),
+        (lambda d: d.update(exemplar_seed=2**63), "exemplar_seed"),
+        (lambda d: d.update(run_name="../x"), "run_name"),
+        (lambda d: d.update(run_name=""), "run_name"),
+        (lambda d: d.update(models=[]), "models"),
+        (lambda d: d.update(tasks=[]), "tasks"),
+        (lambda d: d["models"][0].update(max_new_tokens=0), "max_new_tokens"),
     ],
 )
 def test_invalid_configs_are_rejected(tmp_path, mutation, message):

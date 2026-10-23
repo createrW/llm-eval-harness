@@ -42,7 +42,7 @@ class ModelConfig(BaseModel):
     dtype: Literal["auto", "float32", "float16", "bfloat16"] = "auto"
     device: Literal["auto", "cpu", "mps", "cuda"] = "auto"
     batch_size: int = Field(default=8, ge=1)
-    max_new_tokens: int | None = None
+    max_new_tokens: int | None = Field(default=None, ge=1)
 
     @field_validator("provider")
     @classmethod
@@ -74,15 +74,17 @@ class EvalConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    run_name: str
-    seed: int = 42
-    exemplar_seed: int | None = None
+    # one path component: results go under <output_dir>/<run_name>/<run_id>/
+    run_name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    # seeds are >= 0 (numpy SeedSequence) and fit the int64 seed columns of §8.2
+    seed: int = Field(default=42, ge=0, le=2**63 - 1)
+    exemplar_seed: int | None = Field(default=None, ge=0, le=2**63 - 1)
     n_examples: int = Field(default=100, ge=1)
     output_dir: str = "data/processed/runs"
     scoring: Literal["auto"] | ScoringMode = "auto"
     bootstrap_resamples: int = Field(default=1000, ge=1)
-    models: list[ModelConfig]
-    tasks: list[TaskConfig]
+    models: list[ModelConfig] = Field(min_length=1)
+    tasks: list[TaskConfig] = Field(min_length=1)
     prompt_variants: list[PromptVariant] = Field(min_length=1)
 
     @field_validator("models")
