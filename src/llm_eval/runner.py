@@ -30,12 +30,26 @@ import pandas as pd
 from tqdm import tqdm
 
 from llm_eval.config import EvalConfig, GridCell, config_hash, expand_grid
-from llm_eval.data.dataset import Example, Task, get_task
+from llm_eval.data.dataset import Example, Task, TaskType, get_task
 from llm_eval.evaluation.metrics import primary_metric, score_multiple_choice
 from llm_eval.evaluation.report import summarize
 from llm_eval.evaluation.results import ExampleRecord, records_to_frame, write_run
-from llm_eval.features.prompts import PromptVariant, check_supported, render_mc_loglikelihood
-from llm_eval.models.base_model import LoglikelihoodRequest, Model, ScoringMode
+from llm_eval.features.prompts import (
+    N_EXEMPLARS,
+    PromptVariant,
+    check_supported,
+    render_generation,
+    render_mc_generation,
+    render_mc_loglikelihood,
+    stop_sequences,
+)
+from llm_eval.features.prompts import max_new_tokens as default_max_new_tokens
+from llm_eval.models.base_model import (
+    GenerationRequest,
+    LoglikelihoodRequest,
+    Model,
+    ScoringMode,
+)
 from llm_eval.models.registry import load_model
 
 logger = logging.getLogger("llm_eval")
@@ -76,23 +90,53 @@ def evaluate_cell(
     run_id: str,
     seed: int,
     exemplar_seed: int | None = None,
+    max_new_tokens: int | None = None,
 ) -> list[ExampleRecord]:
-    """Score one cell; Day 1 runs multiple-choice log-likelihood cells only.
+    """Score one cell with a single ``loglikelihood`` or ``generate`` call for all its examples.
 
-    All ``K × n`` (context, continuation) requests go to the model in one ``loglikelihood`` call.
-    ``exemplar_seed`` is unused until few-shot cells land (Day 2).
+    Few-shot exemplars are drawn per example with ``exemplar_seed`` (default ``seed``), so every
+    model of a run sees the same exemplars for the same example (design §7.3).
+    ``max_new_tokens`` overrides the per-variant generation budget.
     """
     check_supported(
         task.task_type, variant, scoring, cell=_cell_name(model.name, task.name, variant)
     )
-    prompts = [render_mc_loglikelihood(task, ex, variant) for ex in examples]
-    requests = [
-        LoglikelihoodRequest(p.context, continuation)
-        for p in prompts
-        for continuation in p.continuations
-    ]
+    shot_seed = None
+    shots: dict[str, list[Example]] = {}
+    if variant is PromptVariant.FEW_SHOT_3:
+        shot_seed = exemplar_seed if exemplar_seed is not None else seed
+        shots = {ex.id: task.exemplars(N_EXEMPLARS, shot_seed, ex.id) for ex in examples}
+    base = {
+        "run_id": run_id,
+        "model": model.name,
+        "task": task.name,
+        "prompt_variant": variant.value,
+        "scoring": scoring.value,
+        "metric": primary_metric(task.task_type, scoring),
+        "seed": seed,
+        "exemplar_seed": shot_seed,
+    }
+    if scoring is ScoringMode.LOGLIKELIHOOD:
+        return _loglikelihood_records(model, task, examples, variant, shots, base)
+    budget = max_new_tokens or default_max_new_tokens(task.task_type, variant)
+    return _generation_records(model, task, examples, variant, shots, base, budget)
+
+
+def _shot_ids(shots: dict[str, list[Example]], example: Example) -> tuple[str, ...] | None:
+    return tuple(e.id for e in shots[example.id]) if shots else None
+
+
+def _loglikelihood_records(
+    model: Model,
+    task: Task,
+    examples: Sequence[Example],
+    variant: PromptVariant,
+    shots: dict[str, list[Example]],
+    base: dict[str, Any],
+) -> list[ExampleRecord]:
+    prompts = [render_mc_loglikelihood(task, ex, variant, shots.get(ex.id, ())) for ex in examples]
+    requests = [LoglikelihoodRequest(p.context, c) for p in prompts for c in p.continuations]
     results = model.loglikelihood(requests)
-    metric = primary_metric(task.task_type, scoring)
     records: list[ExampleRecord] = []
     start = 0
     for index, (ex, prompt) in enumerate(zip(examples, prompts, strict=True)):
@@ -106,14 +150,7 @@ def evaluate_cell(
         correct_norm = task.is_correct(prediction_norm, ex)
         records.append(
             ExampleRecord(
-                run_id=run_id,
-                model=model.name,
-                task=task.name,
-                prompt_variant=variant.value,
-                scoring=scoring.value,
-                metric=metric,
-                seed=seed,
-                exemplar_seed=None,
+                **base,
                 example_id=ex.id,
                 example_index=index,
                 prompt=prompt.context,
@@ -122,17 +159,64 @@ def evaluate_cell(
                 correct=correct,
                 prediction_norm=prediction_norm,
                 correct_norm=correct_norm,
-                primary_correct=correct_norm if metric == "acc_norm" else correct,
+                primary_correct=correct_norm if base["metric"] == "acc_norm" else correct,
                 choice_logprobs=score.logprobs,
                 choice_logprobs_norm=score.logprobs_norm,
                 generation=None,
                 parse_ok=None,
-                exemplar_ids=None,
+                exemplar_ids=_shot_ids(shots, ex),
                 n_prompt_tokens=ex_results[0].n_context_tokens,
                 n_generated_tokens=None,
                 latency_ms=float(sum(r.latency_ms for r in ex_results)),
                 status="ok",
                 error=None,
+            )
+        )
+    return records
+
+
+def _generation_records(
+    model: Model,
+    task: Task,
+    examples: Sequence[Example],
+    variant: PromptVariant,
+    shots: dict[str, list[Example]],
+    base: dict[str, Any],
+    budget: int,
+) -> list[ExampleRecord]:
+    render = (
+        render_mc_generation if task.task_type is TaskType.MULTIPLE_CHOICE else render_generation
+    )
+    prompts = [render(task, ex, variant, shots.get(ex.id, ())) for ex in examples]
+    stop = stop_sequences(task.task_type, variant)
+    results = model.generate([GenerationRequest(p, budget, stop) for p in prompts])
+    records: list[ExampleRecord] = []
+    for index, (ex, prompt, res) in enumerate(zip(examples, prompts, results, strict=True)):
+        failed = res.error is not None
+        answer = None if failed else task.extract_answer(res.text)
+        correct = None if failed else task.is_correct(answer, ex)
+        records.append(
+            ExampleRecord(
+                **base,
+                example_id=ex.id,
+                example_index=index,
+                prompt=prompt,
+                target=ex.target,
+                prediction=None if failed else (answer or ""),
+                correct=correct,
+                prediction_norm=None,
+                correct_norm=None,
+                primary_correct=correct,
+                choice_logprobs=None,
+                choice_logprobs_norm=None,
+                generation=None if failed else res.text,
+                parse_ok=None if failed else answer is not None,
+                exemplar_ids=_shot_ids(shots, ex),
+                n_prompt_tokens=res.n_prompt_tokens,
+                n_generated_tokens=None if failed else res.n_generated_tokens,
+                latency_ms=float(res.latency_ms),
+                status="error" if failed else "ok",
+                error=res.error,
             )
         )
     return records
@@ -248,7 +332,6 @@ def run_config(
             failed_cells += [_cell_name(c.model.name, c.task.name, c.variant) for c in cells]
             progress.update(len(cells))
             continue
-        models_info[mcfg.name] = {"provider": mcfg.provider, "path": mcfg.path, **model.info()}
         resolved = model.info()
         logger.info(
             "model %s: device=%s dtype=%s revision=%s",
@@ -273,6 +356,7 @@ def run_config(
                     run_id=run_id,
                     seed=cfg.seed,
                     exemplar_seed=exemplar_seed,
+                    max_new_tokens=cell.model.max_new_tokens,
                 )
             except Exception:
                 logger.exception("cell %s failed", name)
@@ -289,6 +373,8 @@ def run_config(
                     time.perf_counter() - started,
                 )
             progress.update(1)
+        # after the cells, so API models report the versions they actually served
+        models_info[mcfg.name] = {"provider": mcfg.provider, "path": mcfg.path, **model.info()}
         del model
         _release_model()
     progress.close()

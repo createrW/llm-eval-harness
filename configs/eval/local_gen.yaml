@@ -1,0 +1,23 @@
+# Both local models x both tasks x all three prompt variants, everything scored by generation
+# (HellaSwag as lettered options A-D, GSM8K as a final number), so the prompt factor is not
+# confounded with the scoring mode and the cells are comparable with the API models.
+run_name: local_gen
+seed: 42
+scoring: generation
+models:
+  - name: qwen2.5-0.5b
+    provider: hf
+    path: Qwen/Qwen2.5-0.5B
+    revision: 060db6499f32faf8b98477b0a26969ef7d8b9987
+    batch_size: 32
+  - name: llama-3.2-1b
+    provider: hf
+    path: unsloth/Llama-3.2-1B  # ungated mirror of meta-llama/Llama-3.2-1B
+    revision: 9535bd9b1d1dea6acafbdc4813b728796aeb28da
+    batch_size: 32
+tasks:
+  - name: hellaswag
+    n_examples: 500
+  - name: gsm8k
+    n_examples: 300
+prompt_variants: [zero_shot, few_shot_3, cot]

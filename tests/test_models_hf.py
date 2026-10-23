@@ -4,7 +4,7 @@ import math
 import pytest
 import torch
 
-from llm_eval.models.base_model import GenerationRequest, LoglikelihoodRequest
+from llm_eval.models.base_model import GenerationRequest, LoglikelihoodRequest, cut_at_stop
 from llm_eval.models.hf_model import HFCausalLM, resolve_device, resolve_dtype
 
 
@@ -161,9 +161,48 @@ def test_from_pretrained_seeds_torch_before_loading_only_when_given_a_seed(
     assert seeds_at_load == [1234, 5]
 
 
-def test_generate_lands_on_day_2(adapter):
-    with pytest.raises(NotImplementedError, match="Day 2"):
-        adapter.generate([GenerationRequest("hello", 4)])
+GEN_REQUESTS = [
+    GenerationRequest("hello world foo", 5),
+    GenerationRequest("bar", 3),
+    GenerationRequest("a b c d e f", 4),
+]
+
+
+def test_generate_returns_results_in_request_order_within_budget(adapter):
+    out = adapter.generate(GEN_REQUESTS)
+    assert [o.n_prompt_tokens for o in out] == [4, 2, 7]  # BOS + one token per word
+    for req, res in zip(GEN_REQUESTS, out, strict=True):
+        assert 0 <= res.n_generated_tokens <= req.max_new_tokens
+        assert res.error is None
+
+
+def test_generate_batched_left_padding_matches_one_at_a_time(tiny_llama, tiny_tokenizer):
+    def run(batch_size):
+        model = HFCausalLM(
+            tiny_llama, tiny_tokenizer, name="t", device="cpu", batch_size=batch_size
+        )
+        return [(r.text, r.n_generated_tokens) for r in model.generate(GEN_REQUESTS)]
+
+    assert run(3) == run(1)
+
+
+def test_generate_ignores_checkpoint_sampling_defaults(adapter, tiny_llama):
+    tiny_llama.generation_config.do_sample = True
+    tiny_llama.generation_config.temperature = 5.0
+    try:
+        runs = [
+            [(r.text, r.n_generated_tokens) for r in adapter.generate(GEN_REQUESTS)] for _ in "ab"
+        ]
+        assert runs[0] == runs[1]
+    finally:
+        tiny_llama.generation_config.do_sample = False
+        tiny_llama.generation_config.temperature = 1.0
+
+
+def test_cut_at_stop_keeps_text_before_the_earliest_stop():
+    assert cut_at_stop(" B\nContext: x", ("\n",)) == " B"
+    assert cut_at_stop("a Q b X c", ("X", "Q")) == "a "
+    assert cut_at_stop("abc", ()) == "abc"
 
 
 def test_registry_hf_factory_forwards_config(monkeypatch):

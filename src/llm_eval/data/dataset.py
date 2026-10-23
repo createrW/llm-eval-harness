@@ -15,8 +15,6 @@ from typing import Any, ClassVar
 
 from llm_eval.seeding import child_rng
 
-_DAY2 = "lands on Day 2"
-
 
 class TaskType(StrEnum):
     """How a task is scored: choose among choices, or generate free text."""
@@ -48,19 +46,23 @@ class Task(ABC):
     dataset_path: ClassVar[str]
     dataset_revision: ClassVar[str]
     default_split: ClassVar[str]
-    stop_sequences: ClassVar[tuple[str, ...]] = ()
+    dataset_config: ClassVar[str | None] = None
+    exemplar_split: ClassVar[str | None] = None
 
     def __init__(self, rows: Callable[[str], Sequence[Mapping[str, Any]]] | None = None) -> None:
         """``rows(split)``, when given, replaces ``datasets.load_dataset`` (test seam)."""
         self._rows_fn = rows
         self._info: dict[str, Any] | None = None
+        self._pool: list[Example] | None = None
 
     def _rows(self, split: str) -> Sequence[Mapping[str, Any]]:
         if self._rows_fn is not None:
             return self._rows_fn(split)
         import datasets
 
-        return datasets.load_dataset(self.dataset_path, split=split, revision=self.dataset_revision)
+        return datasets.load_dataset(
+            self.dataset_path, self.dataset_config, split=split, revision=self.dataset_revision
+        )
 
     @abstractmethod
     def _example(self, row: Mapping[str, Any], row_idx: int, split: str) -> Example:
@@ -87,6 +89,8 @@ class Task(ABC):
             "split": split,
             "n_rows": n_rows,
         }
+        if self.dataset_config is not None:
+            self._info["config"] = self.dataset_config
         if n_examples is None:
             return examples
         perm = child_rng(seed, "subset", self.name).permutation(n_rows)
@@ -107,17 +111,31 @@ class Task(ABC):
         """Whether ``prediction`` equals the canonical gold ``example.target``."""
         return prediction == example.target
 
+    @abstractmethod
     def target_text(self, example: Example) -> str:
         """Gold continuation as shown in a few-shot exemplar."""
-        raise NotImplementedError(_DAY2)
 
-    def exemplars(self, k: int, seed: int, example_id: str) -> list[Example]:
-        """Per-example few-shot exemplar draw (design §7.3)."""
-        raise NotImplementedError(_DAY2)
-
+    @abstractmethod
     def extract_answer(self, generation: str) -> str | None:
         """Parse a generation into a canonical answer; ``None`` means unparsable."""
-        raise NotImplementedError(_DAY2)
+
+    def exemplars(self, k: int, seed: int, example_id: str) -> list[Example]:
+        """``k`` exemplars for ``example_id`` from :attr:`exemplar_split` (design §7.3).
+
+        The draw depends only on ``(seed, task, example_id)``: identical for every model of a run
+        (pairing preserved) and independent across examples. The example itself is never drawn.
+        """
+        if self.exemplar_split is None:
+            raise ValueError(f"{self.name} has no exemplar split")
+        if self._pool is None:
+            rows = self._rows(self.exemplar_split)
+            self._pool = [self._example(r, i, self.exemplar_split) for i, r in enumerate(rows)]
+        rng = child_rng(seed, "exemplars", self.name, example_id)
+        drawn = rng.choice(len(self._pool), size=min(k + 1, len(self._pool)), replace=False)
+        picked = [self._pool[int(i)] for i in drawn if self._pool[int(i)].id != example_id][:k]
+        if len(picked) < k:
+            raise ValueError(f"{self.name}/{self.exemplar_split} has fewer than {k} exemplars")
+        return picked
 
 
 TASKS: dict[str, type[Task]] = {}

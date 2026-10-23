@@ -184,13 +184,36 @@ def test_registry_exposes_hellaswag_and_rejects_unknown():
         get_task("nope")
 
 
-def test_day2_methods_raise_not_implemented():
+def test_target_text_is_the_gold_ending_and_letters_parse_back():
     task = make_task()
     ex = task.load("validation", None, seed=0)[0]
-    for call in (
-        lambda: task.target_text(ex),
-        lambda: task.exemplars(3, 0, ex.id),
-        lambda: task.extract_answer("x"),
-    ):
-        with pytest.raises(NotImplementedError, match="Day 2"):
-            call()
+    assert task.target_text(ex) == "starts pulling up roofing on a roof."
+    assert [task.extract_answer(g) for g in (" B", "(C)", "**D**", "so the answer is A.")] == [
+        "1",
+        "2",
+        "3",
+        "0",
+    ]
+    assert task.extract_answer(" A man walks in") is None
+    assert task.extract_answer("no letter here") is None
+
+
+def _pool_rows(n):
+    return [dict(ROWS[2], ind=i, ctx_a=f"Event {i}.") for i in range(n)]
+
+
+def test_exemplars_are_seeded_per_example_from_the_train_split():
+    task = HellaSwagTask(rows=lambda split: _pool_rows(50))
+    a = task.exemplars(3, 7, "hellaswag/validation/0")
+    assert [e.id.split("/")[1] for e in a] == ["train"] * 3
+    assert len({e.id for e in a}) == 3
+    assert a == task.exemplars(3, 7, "hellaswag/validation/0")
+    assert a != task.exemplars(3, 8, "hellaswag/validation/0")
+    draws = {
+        tuple(e.id for e in task.exemplars(3, 7, f"hellaswag/validation/{i}")) for i in range(5)
+    }
+    assert len(draws) > 1  # independent across examples
+    for i in range(50):  # an example evaluated on train never sees itself
+        assert f"hellaswag/train/{i}" not in [
+            e.id for e in task.exemplars(3, 7, f"hellaswag/train/{i}")
+        ]

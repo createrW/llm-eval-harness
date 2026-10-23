@@ -48,12 +48,24 @@ class GenerationRequest:
 
 @dataclass(frozen=True)
 class GenerationResult:
-    """Generated text, with prompt/generated token counts and latency."""
+    """Generated text, with prompt/generated token counts and latency.
+
+    ``error`` is set (and ``text`` is empty) when the request failed after retries; the runner
+    records such rows with ``status="error"`` so infrastructure failures never count as wrong
+    answers (design §8.2).
+    """
 
     text: str
     n_prompt_tokens: int
     n_generated_tokens: int
     latency_ms: float
+    error: str | None = None
+
+
+def cut_at_stop(text: str, stop: Sequence[str]) -> str:
+    """``text`` up to the earliest occurrence of any stop string (stop strings excluded)."""
+    cuts = [i for s in stop if s and (i := text.find(s)) >= 0]
+    return text[: min(cuts)] if cuts else text
 
 
 class Model(Protocol):

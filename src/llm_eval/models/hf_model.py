@@ -16,13 +16,14 @@ from typing import Any
 
 import torch
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from llm_eval.models.base_model import (
     GenerationRequest,
     GenerationResult,
     LoglikelihoodRequest,
     LoglikelihoodResult,
+    cut_at_stop,
 )
 
 _DTYPES: dict[str, torch.dtype] = {
@@ -31,6 +32,7 @@ _DTYPES: dict[str, torch.dtype] = {
     "bfloat16": torch.bfloat16,
 }
 _ALLOW_PATTERNS = ["*.json", "*.safetensors", "*.txt", "*.model", "*.jinja"]
+LOGITS_BUDGET_BYTES = 1 << 30  # per log-likelihood forward pass
 
 
 def resolve_device(device: str) -> str:
@@ -114,7 +116,7 @@ class HFCausalLM:
             local = snapshot_download(path, revision=revision, allow_patterns=_ALLOW_PATTERNS)
             revision = Path(local).name  # the 40-hex commit actually loaded
         tokenizer = AutoTokenizer.from_pretrained(local)
-        # Always an explicit torch dtype: omitted or "auto" means checkpoint dtype (§7.5).
+        # Explicit torch dtype; "auto" is float32 everywhere, never the checkpoint's (§7.5).
         model = AutoModelForCausalLM.from_pretrained(local, dtype=resolve_dtype(dtype, device))
         model = model.to(device).eval()
         return cls(
@@ -159,8 +161,14 @@ class HFCausalLM:
         encoded = [self._encode_pair(r.context, r.continuation) for r in requests]
         order = sorted(range(len(encoded)), key=lambda i: len(encoded[i][0]), reverse=True)
         results: dict[int, LoglikelihoodResult] = {}
-        for start in range(0, len(order), self.batch_size):
-            batch = order[start : start + self.batch_size]
+        vocab = int(self.model.config.vocab_size)
+        start = 0
+        while start < len(order):
+            # full-vocabulary fp32 logits for every position: cap their size per forward pass
+            width = len(encoded[order[start]][0])
+            rows = max(1, min(self.batch_size, LOGITS_BUDGET_BYTES // (width * vocab * 4)))
+            batch = order[start : start + rows]
+            start += rows
             t0 = time.perf_counter()
             logprobs = self._score_batch([encoded[i] for i in batch])
             latency_ms = (time.perf_counter() - t0) * 1000.0 / len(batch)
@@ -194,5 +202,71 @@ class HFCausalLM:
             return torch.stack(sums).tolist()
 
     def generate(self, requests: Sequence[GenerationRequest]) -> list[GenerationResult]:
-        """Greedy generation (design §7.2)."""
-        raise NotImplementedError("HFCausalLM.generate lands on Day 2")
+        """Greedy, left-padded, length-sorted batches cut at stop strings (§7.2).
+
+        Results come back in request order.
+        """
+        encoded = [self._fit_prompt(r.prompt, r.max_new_tokens) for r in requests]
+        order = sorted(range(len(encoded)), key=lambda i: len(encoded[i]), reverse=True)
+        results: dict[int, GenerationResult] = {}
+        for start in range(0, len(order), self.batch_size):
+            batch = order[start : start + self.batch_size]
+            budget = max(requests[i].max_new_tokens for i in batch)
+            stops = sorted({s for i in batch for s in requests[i].stop})
+            t0 = time.perf_counter()
+            new_ids = self._generate_batch([encoded[i] for i in batch], budget, stops)
+            latency_ms = (time.perf_counter() - t0) * 1000.0 / len(batch)
+            for i, ids in zip(batch, new_ids, strict=True):
+                ids = ids[: requests[i].max_new_tokens]
+                text = self.tokenizer.decode(ids, skip_special_tokens=True)
+                results[i] = GenerationResult(
+                    text=cut_at_stop(text, requests[i].stop),
+                    n_prompt_tokens=len(encoded[i]),
+                    n_generated_tokens=len(ids),
+                    latency_ms=latency_ms,
+                )
+        return [results[i] for i in range(len(encoded))]
+
+    def _fit_prompt(self, prompt: str, max_new_tokens: int) -> list[int]:
+        """Prompt ids (BOS as the tokenizer adds it), left-truncated to leave room to generate."""
+        ids = list(self.tokenizer(prompt, add_special_tokens=True).input_ids)
+        excess = len(ids) + max_new_tokens - self._max_length
+        if excess > 0:
+            bos_id = self.tokenizer.bos_token_id
+            keep = 1 if bos_id is not None and ids and ids[0] == bos_id else 0
+            ids = ids[:keep] + ids[keep + excess :]
+        return ids
+
+    def _generate_batch(
+        self, prompts: Sequence[list[int]], max_new_tokens: int, stops: Sequence[str]
+    ) -> list[list[int]]:
+        """New token ids per prompt, ending before the first eos/pad."""
+        width = max(len(p) for p in prompts)
+        input_ids = torch.full((len(prompts), width), self._pad_id, dtype=torch.long)
+        attention_mask = torch.zeros((len(prompts), width), dtype=torch.long)
+        for row, ids in enumerate(prompts):
+            input_ids[row, width - len(ids) :] = torch.tensor(ids, dtype=torch.long)
+            attention_mask[row, width - len(ids) :] = 1
+        config = GenerationConfig(  # explicit: checkpoint sampling defaults never apply
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            num_beams=1,
+            temperature=1.0,  # neutral values, so checkpoint sampling settings are not merged in
+            top_p=1.0,
+            pad_token_id=self._pad_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            stop_strings=list(stops) or None,
+        )
+        with torch.inference_mode():
+            out = self.model.generate(
+                input_ids=input_ids.to(self.device),
+                attention_mask=attention_mask.to(self.device),
+                generation_config=config,
+                tokenizer=self.tokenizer if stops else None,
+            )
+        ends = {self._pad_id, self.tokenizer.eos_token_id} - {None}
+        new_ids = []
+        for row in out[:, width:].tolist():
+            cut = next((j for j, t in enumerate(row) if t in ends), len(row))
+            new_ids.append(row[:cut])
+        return new_ids

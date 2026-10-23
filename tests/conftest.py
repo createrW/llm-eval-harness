@@ -4,8 +4,9 @@ import copy
 import pytest
 
 from llm_eval.data.dataset import register_task
+from llm_eval.data.gsm8k import GSM8KTask
 from llm_eval.data.hellaswag import HellaSwagTask
-from llm_eval.models.base_model import LoglikelihoodResult
+from llm_eval.models.base_model import GenerationResult, LoglikelihoodResult
 from llm_eval.models.registry import register_provider
 
 
@@ -123,7 +124,15 @@ class FakeModel:
         return out
 
     def generate(self, requests):
-        raise NotImplementedError
+        """GSM8K-style prompts get "The answer is 42.", lettered prompts get " B"."""
+        self.calls += 1
+        out = []
+        for r in requests:
+            if self.fail_on_context and self.fail_on_context in r.prompt:
+                raise RuntimeError("boom")
+            text = " The answer is 42." if "Question:" in r.prompt else " B"
+            out.append(GenerationResult(text, len(r.prompt.split()), 2, 1.0))
+        return out
 
     def info(self):
         return {"revision": None, "dtype": "fake", "device": "cpu"}
@@ -140,3 +149,17 @@ class OfflineHellaSwag(HellaSwagTask):
 
     def __init__(self, rows=None):
         super().__init__(rows=rows or (lambda split: RUNNER_ROWS))
+
+
+GSM_ROWS = [
+    {"question": f"Q{i}: what is {a} + {b}?", "answer": f"{a}+{b}={a + b}\n#### {a + b}"}
+    for i, (a, b) in enumerate([(40, 2), (1, 1), (20, 22), (5, 5), (30, 12), (2, 3)])
+]
+
+
+@register_task
+class OfflineGSM8K(GSM8KTask):
+    name = "gsm8k_offline"
+
+    def __init__(self, rows=None):
+        super().__init__(rows=rows or (lambda split: GSM_ROWS))

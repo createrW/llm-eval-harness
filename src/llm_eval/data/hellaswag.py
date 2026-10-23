@@ -1,4 +1,8 @@
-"""HellaSwag with lm-evaluation-harness preprocessing (design §7.1)."""
+"""HellaSwag with lm-evaluation-harness preprocessing (design §7.1).
+
+Log-likelihood cells score the four preprocessed endings; generation cells show them as lettered
+options A-D and parse the chosen letter back into the gold-index string (design §7.3).
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,10 @@ from collections.abc import Mapping
 from typing import Any
 
 from llm_eval.data.dataset import Example, Task, TaskType, register_task
+
+LETTERS = "ABCD"
+_EXPLICIT_LETTER = re.compile(r"(?i:answer is|answer:)\s*[*(\[]*\s*([A-D])(?![A-Za-z])")
+_LEADING_LETTER = re.compile(r"^[\s*(\[]*([A-D])\s*(?:[.):\]*]|$)")
 
 
 def _preprocess(text: str) -> str:
@@ -26,7 +34,7 @@ class HellaSwagTask(Task):
     dataset_path = "Rowan/hellaswag"
     dataset_revision = "218ec52e09a7e7462a5400043bb9a69a41d06b76"
     default_split = "validation"
-    stop_sequences = ("\n\n",)
+    exemplar_split = "train"
 
     def _example(self, row: Mapping[str, Any], row_idx: int, split: str) -> Example:
         ctx = row["ctx_a"] + " " + row["ctx_b"].capitalize()
@@ -45,3 +53,20 @@ class HellaSwagTask(Task):
 
     def context(self, example: Example) -> str:
         return example.inputs["context"]
+
+    def target_text(self, example: Example) -> str:
+        assert example.choices is not None
+        return example.choices[int(example.target)]
+
+    def extract_answer(self, generation: str) -> str | None:
+        """Gold-index string of the chosen letter, or ``None`` when no letter can be read.
+
+        An explicit "answer is X" / "Answer: X" wins (last one, for chain-of-thought); otherwise a
+        reply that starts with a bare letter ("B", "B.", "(B)", "**B**") counts. A sentence that
+        merely starts with the article "A" does not.
+        """
+        explicit = _EXPLICIT_LETTER.findall(generation)
+        if explicit:
+            return str(LETTERS.index(explicit[-1]))
+        leading = _LEADING_LETTER.match(generation)
+        return str(LETTERS.index(leading.group(1))) if leading else None

@@ -98,17 +98,17 @@ def test_expand_grid_order_is_models_outer_then_tasks():
     ]
 
 
-def test_expand_grid_rejects_few_shot_on_day_1():
-    data = yaml.safe_load(yaml.safe_dump(BASE))
-    data["prompt_variants"] = ["zero_shot", "few_shot_3"]
-    with pytest.raises(UnsupportedCellError, match=r"q×hellaswag×few_shot_3: .* lands on Day 2"):
-        expand_grid(EvalConfig(**data))
+def test_expand_grid_resolves_cot_to_generation_and_rejects_forced_loglikelihood_cot():
+    data = dict(BASE, prompt_variants=["zero_shot", "few_shot_3", "cot"])
+    cells = expand_grid(EvalConfig(**data))
+    assert [c.scoring.value for c in cells] == ["loglikelihood", "loglikelihood", "generation"]
+    with pytest.raises(UnsupportedCellError, match=r"q×hellaswag×cot: .* not a valid combination"):
+        expand_grid(EvalConfig(**dict(data, scoring="loglikelihood")))
 
 
-def test_expand_grid_rejects_forced_generation_on_day_1():
-    data = dict(BASE, scoring="generation")
-    with pytest.raises(UnsupportedCellError, match=r"q×hellaswag×zero_shot: .* lands on Day 3"):
-        expand_grid(EvalConfig(**data))
+def test_expand_grid_forced_generation_applies_to_every_cell():
+    data = dict(BASE, scoring="generation", prompt_variants=["zero_shot", "few_shot_3"])
+    assert {c.scoring.value for c in expand_grid(EvalConfig(**data))} == {"generation"}
 
 
 def test_expand_grid_rejects_explicit_loglikelihood_on_provider_without_it(monkeypatch):

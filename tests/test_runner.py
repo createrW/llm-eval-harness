@@ -4,7 +4,10 @@ from datetime import UTC, datetime
 import pytest
 
 from llm_eval.config import EvalConfig
+from llm_eval.data.dataset import get_task
 from llm_eval.evaluation.results import read_run
+from llm_eval.features.prompts import PromptVariant
+from llm_eval.models.base_model import GenerationResult, ScoringMode
 from llm_eval.runner import (
     RunResult,
     evaluate_cell,
@@ -13,6 +16,7 @@ from llm_eval.runner import (
     library_versions,
     run_config,
 )
+from tests.conftest import FakeModel
 
 CFG = {
     "run_name": "fake_run",
@@ -212,3 +216,76 @@ def test_run_config_logs_progress_per_model_and_cell(tmp_path, caplog):
     assert any(
         m.startswith("cell fake-a×hellaswag_offline×zero_shot: 4 examples") for m in messages
     )
+
+
+def test_generation_cell_parses_answers_and_records_per_example_exemplars():
+    task = get_task("gsm8k_offline")
+    examples = task.load("test", None, seed=0)
+    records = evaluate_cell(
+        FakeModel(),
+        task,
+        examples,
+        PromptVariant.FEW_SHOT_3,
+        ScoringMode.GENERATION,
+        run_id="r",
+        seed=1,
+    )
+    assert [r.prediction for r in records] == ["42"] * 6
+    assert [r.correct for r in records] == [True, False, True, False, True, False]
+    assert all(r.parse_ok and r.generation == " The answer is 42." for r in records)
+    assert all(len(r.exemplar_ids) == 3 and r.exemplar_seed == 1 for r in records)
+    assert {r.metric for r in records} == {"exact_match"}
+    assert records[0].prompt.count("Question:") == 4  # 3 exemplars + the query
+
+
+def test_mc_generation_cell_reads_the_letter_as_a_gold_index():
+    task = get_task("hellaswag_offline")
+    examples = task.load("validation", None, seed=0)
+    records = evaluate_cell(
+        FakeModel(),
+        task,
+        examples,
+        PromptVariant.ZERO_SHOT,
+        ScoringMode.GENERATION,
+        run_id="r",
+        seed=1,
+    )
+    assert [r.prediction for r in records] == ["1"] * 4  # " B"
+    assert {r.metric for r in records} == {"acc"}
+    assert records[0].prompt.endswith("Answer:")
+    assert records[0].exemplar_ids is None and records[0].exemplar_seed is None
+
+
+def test_failed_requests_become_error_rows_not_wrong_answers():
+    class Failing(FakeModel):
+        def generate(self, requests):
+            return [GenerationResult("", 1, 0, 1.0, error="rate limited") for _ in requests]
+
+    task = get_task("gsm8k_offline")
+    records = evaluate_cell(
+        Failing(),
+        task,
+        task.load("test", None, seed=0),
+        PromptVariant.ZERO_SHOT,
+        ScoringMode.GENERATION,
+        run_id="r",
+        seed=1,
+    )
+    assert {(r.status, r.correct, r.primary_correct, r.error) for r in records} == {
+        ("error", None, None, "rate limited")
+    }
+
+
+def test_generation_grid_runs_every_variant_on_both_tasks(tmp_path):
+    cfg = dict(
+        CFG,
+        n_examples=4,
+        scoring="generation",
+        tasks=[{"name": "hellaswag_offline"}, {"name": "gsm8k_offline"}],
+        prompt_variants=["zero_shot", "few_shot_3", "cot"],
+    )
+    result = run_config(EvalConfig(**cfg), project_root=tmp_path, now=NOW)
+    assert result.failed_cells == []
+    assert len(result.summary) == 6
+    frame, _ = read_run(result.run_dir)
+    assert set(frame["scoring"]) == {"generation"}
