@@ -179,15 +179,15 @@ workspace, because the harness sends no workspace header. The runs need the `api
 extras (`local` brings `datasets`), which `uv sync --all-extras --all-groups` installs.
 
 ```bash
-uv run llm-eval run --config configs/eval/api_smoke.yaml
+make api-smoke
 scripts/run_grid.sh 3 configs/eval/api_gen.yaml
-uv run python scripts/check_runs.py data/processed/runs/api_gen --copy-to data/samples/runs
+make keep-runs RUNS=data/processed/runs/api_gen
 make analyze
 ```
 
-The smoke config sends 24 requests (under $0.01); `--n-examples` cannot shrink `api_gen.yaml`,
-whose tasks set their own `n_examples`. `check_runs.py` copies three complete runs only (no failed
-cells, both models loaded, no error rows): a run whose key was missing would otherwise sit next
+`make api-smoke` runs `configs/eval/api_smoke.yaml`, 24 requests (under $0.01); `--n-examples` cannot shrink `api_gen.yaml`,
+whose tasks set their own `n_examples`. `make keep-runs` copies three complete runs only (no
+failed cells, both models loaded, no error rows): a run whose key was missing would otherwise sit next
 to complete ones and stop `make analyze`. In `data/samples/runs/` the API cells join the
 generation families, so their Bonferroni `k` grows from 9 to 30, H1 and H3 included.
 
@@ -232,18 +232,21 @@ grid, and Modal requires a payment method on file):
 
 ```bash
 uv run --with modal==1.6.2 modal setup
-caffeinate -is uv run --with modal==1.6.2 modal run --detach scripts/modal_eval.py
+make modal-check
+make modal-grid
 ```
 
-`modal setup` logs in once in the browser and stores the token in `~/.modal.toml`. The job runs
+`modal setup` logs in once in the browser and stores the token in `~/.modal.toml`;
+`make modal-check` confirms the code is committed and the token works. `make modal-grid` runs
+`caffeinate -is uv run --with modal==1.6.2 modal run --detach scripts/modal_eval.py`
+(`make modal-pilot` runs `local_ll` once first, which counts as its first rerun). The job runs
 on an A10; `LLM_EVAL_GPU=L4` in front of the command picks an L4 (keep one GPU type for all
 reruns). `--detach` keeps the job running when the terminal closes or the laptop sleeps, and
 `caffeinate -is` keeps the Mac awake so the results download at the end. Each finished run is
 saved to the Modal volume `llm-eval-runs` as soon as it completes. The same command run again
 skips finished runs (same config, commit and GPU type), runs the rest and copies every finished
 run into `data/processed/runs/`; a preempted GPU function restarts and resumes the same way. To
-fetch the volume by hand, use a new directory: `mkdir -p data/processed/modal`, then
-`uv run --with modal==1.6.2 modal volume get llm-eval-runs / data/processed/modal`. Model
+fetch the volume by hand, `make modal-fetch` copies it into a new `data/processed/modal/`. Model
 downloads are cached in a second volume.
 
 **Any GPU machine over SSH** (RunPod, Vast.ai, Thunder Compute): push the repo to GitHub first,
@@ -265,15 +268,16 @@ config and analyse:
 ```bash
 mkdir -p data/samples/mps/local_ll
 git mv data/samples/runs/local_ll/20261023T181005Z-0bfebd23 data/samples/mps/local_ll/
-uv run python scripts/check_runs.py data/processed/runs/local_ll data/processed/runs/local_gen --copy-to data/samples/runs
+make check-runs
+make keep-runs
 make analyze
 make mlflow
 ```
 
 Runs of one config on different hardware are kept apart (reruns are grouped by config, device
 and dtype), so the laptop's MPS run moves to `data/samples/mps/local_ll/` before the cloud runs
-are analysed. `check_runs.py` copies nothing unless each config has three complete runs on one
-GPU type. The runner logs the resolved device when each model loads and warns when
+are analysed. `make check-runs` lists the runs in `data/processed/runs/` (`scripts/check_runs.py`);
+`make keep-runs` copies nothing unless each config has three complete runs on one GPU type. The runner logs the resolved device when each model loads and warns when
 `device: auto` falls back to the CPU.
 
 ## Environment variables
