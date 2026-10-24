@@ -1,0 +1,20 @@
+# Smoke test of the API keys and adapters before the full API grid: 2 examples per task, 24
+# requests in total (under $0.01). Run it with `uv run llm-eval run --config
+# configs/eval/api_smoke.yaml`. `--n-examples` cannot shrink api_gen.yaml, whose tasks set n.
+run_name: api_smoke
+seed: 42
+n_examples: 2
+scoring: generation
+models:
+  - name: gpt-4o-mini
+    provider: openai
+    path: gpt-4o-mini
+    batch_size: 2
+  - name: claude-haiku-5.5
+    provider: anthropic
+    path: claude-haiku-5-5
+    batch_size: 2
+tasks:
+  - name: hellaswag
+  - name: gsm8k
+prompt_variants: [zero_shot, few_shot_3, cot]

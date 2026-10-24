@@ -1,12 +1,15 @@
 # Renting GPUs and hosting for llm-eval-harness: decision memo (2026-10-18)
 
 > **Superseded for deployment (2026-10-23).** Deployment follows the author's hosting plan: the
-> evaluations run locally and the dashboard runs on Streamlit Community Cloud ($0). The full local
-> grid ran on an Apple M5 laptop. This memo stays as the price reference for an optional rented
-> GPU; its setup commands that use plain `uv sync` install the CPU wheel on Linux, so follow the
-> README section "Run the grid on a cloud GPU" instead.
+> dashboard runs on Streamlit Community Cloud ($0), the remaining grid runs on a cloud GPU (Modal;
+> RunPod or any SSH GPU machine as the fallback) because the 16 GB laptop ran out of memory, and
+> MLflow stays a local SQLite store on the laptop, shown through README screenshots. The author's
+> Oracle Cloud account is banned, so every Oracle option below is unavailable. This memo stays as
+> the price reference for an optional rented GPU; its setup commands that use plain `uv sync`
+> install the CPU wheel on Linux, so follow the README section "Run the grid on a cloud GPU"
+> instead.
 
-**Scope.** This memo covers renting compute for an inference-only eval grid and hosting an always-on Streamlit + MLflow box, on a $0-15 budget. The grid:
+**Scope.** This memo covers renting compute for an inference-only eval grid and, optionally, a public MLflow UI (the decision is to keep MLflow local), on a $0-15 budget. The grid:
 - Models: Qwen2.5-0.5B and Llama-3.2-1B.
 - HellaSwag: 500 items × 4 endings × 3 prompts.
 - GSM8K: 300 items × 3 prompts, greedy decoding, up to 512 new tokens.
@@ -23,8 +26,8 @@
    - AWS g6.xlarge or GCP g2-standard-4 (L4): paid from sign-up credits, but only once a GPU quota request is approved.
    - Camber via the Student Pack: 5 GPU-h/month, GPU type unknown, so check on signup. Unverified for SSH/Docker. That covers the batched grid (~1-2 h) at $0, with no card.
    - Modal academic program: "up to $10k free compute credits" for "graduate students, labs, and researchers", on application ([modal.com/pricing](https://modal.com/pricing)). Eligibility for a master's project is not confirmed.
-3. **Dashboard + MLflow:** host the public dashboard on Streamlit Community Cloud ($0). Run MLflow on an Oracle Always Free A1 VM ($0), or just on the laptop. Fallbacks in order: Azure for Students B1s ($0, no card), then a DigitalOcean 1 GiB Droplet ($6/month).
-4. **Expected total:** $0 if the Thunder credit and the Oracle sign-up both work. The worst realistic case is about $11-16: a Vast deposit (minimum not stated in its billing docs) or the $10 RunPod minimum (about $1.50 of it actually used), plus one $6 DigitalOcean month. Either provider fits under $15 if you avoid the DigitalOcean month. Calls to the GPT-4o-mini and Claude Haiku APIs are extra.
+3. **Dashboard + MLflow:** host the public dashboard on Streamlit Community Cloud ($0). Keep MLflow on the laptop (`make mlflow`, `make mlflow-ui`) and show it through README screenshots. For a public MLflow UI later: Fly.io (no free tier; 1 GB $6.70/month always on, far less with auto-stop), Railway Hobby ($5/month including $5 of usage), a DigitalOcean 1 GiB Droplet ($6/month), or Azure for Students B2ats v2 ($0 within the student offer, no card; new subscriptions can no longer deploy B1s).
+4. **Expected total:** $0 cash if a GPU credit covers the grid (Modal's $30 monthly Starter credit, or the Thunder student credit); MLflow stays on the laptop and adds nothing. The worst realistic case is about $10-11: the $10 RunPod minimum (about $1.50 of it used) or a Vast deposit (minimum not stated in its billing docs). A public MLflow host would add $5-7/month. Calls to the GPT-4o-mini and Claude Haiku APIs are extra.
 5. **Is the laptop enough?** Yes, if you batch generation. On this M5 today, Qwen2.5-0.5B in bf16 decoded 33 tok/s at batch 1 and 566 tok/s at batch 32. That puts the whole grid at about 3-4 h batched, versus about 18 h at batch 1. Rent a GPU for one afternoon only if you want one pinned CUDA environment for all reruns, or if you keep batch-1 decoding.
 
 ## Compute need
@@ -81,7 +84,7 @@
 - RunPod Community L4 $0.44 and A6000 $0.33 ([pricing](https://www.runpod.io/pricing)).
 - AWS g4dn.xlarge T4 $0.526 ([price map](https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-ondemand-without-sec-sel/US%20East%20%28N.%20Virginia%29/Linux/index.json)) and GCP n1-standard-4 + T4 $0.54 ([general-purpose](https://cloud.google.com/products/compute/pricing/general-purpose) plus the accelerator page): no bf16, and about the same price as an L4.
 - Azure NC4as_T4_v3 $0.526 ([retail API](https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'eastus'%20and%20armSkuName%20eq%20'Standard_NC4as_T4_v3')): not possible on Azure for Students; needs pay-as-you-go plus a quota request.
-- OCI VM.GPU.A10.1 $2.00 ([price list](https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD&partNumber=B95909)): the A10 limit is "Contact Us".
+- OCI VM.GPU.A10.1: not an option (the author's Oracle account is banned, 2026-10-23).
 - Shadeform L4 $0.95 ([compare](https://shadeform.com/directory/gpus/compare/A100/L4)).
 - Hyperbolic: H100 and larger only, from $3.19 ([marketplace](https://www.hyperbolic.ai/marketplace)).
 - TensorDock: its price table is dated 2024-07-24 and its APIs returned nothing ([page](https://www.tensordock.com/cloud-gpus.html)).
@@ -154,9 +157,8 @@
 | Option | Spec | Price | Can run | Catches | Verified? | Source |
 |---|---|---|---|---|---|---|
 | Streamlit Community Cloud | 0.078-2 cores, 690 MB-2.7 GB RAM, up to 50 GB (limits "as of February 2024") | $0 ("Totally free") | Dashboard only, reading committed parquet files | Sleeps after 12 h without traffic; one click wakes it. Cannot host the MLflow server | Yes | [manage your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app), [streamlit.io/cloud](https://streamlit.io/cloud) |
-| Oracle Always Free, VM.Standard.A1.Flex (Arm) | 2 OCPU + 12 GB total; 200 GB block storage; 10 TB/month egress | $0 | Both, comfortably (docker compose: MLflow + SQLite/Postgres + Streamlit) | Card and mobile number at sign-up. Home region is fixed at sign-up. A1 capacity often unavailable. Instances are reclaimed after 7 idle days (p95 CPU, network, and A1 memory all under 20%). Needs arm64 images | Yes, re-read 2026-10-18 | [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Free Tier](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm) |
-| Oracle Always Free, VM.Standard.E2.1.Micro (up to 2) | 1/8 OCPU (can burst), 1 GB, 50 Mbps | $0 | MLflow only, with swap | Same rules as A1 | Yes | [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) |
-| Azure for Students, B1s | 1 vCPU / 1 GiB | $0: 750 h/month each of B1s, B2pts v2 and B2ats v2 for 12 months, plus $100 credit | MLflow only, with swap | No card; school email. Disabled when the credit or the 12 months run out, unless you move to pay-as-you-go | Yes | [Azure for Students](https://azure.microsoft.com/en-us/free/students/) |
+| Oracle Always Free (A1.Flex, E2.1.Micro) | — | — | Not available: the author's account is banned (2026-10-23) | — | — | — |
+| Azure for Students, B2ats v2 (AMD) or B2pts v2 (Arm) | 2 vCPU / 1 GiB (B2ats v2: 20% base CPU) | $0: 750 h/month each of B1s, B2pts v2 and B2ats v2 for 12 months, plus $100 credit; disks billed separately | MLflow only (1 worker, job runner off, add swap) | No card; full-time students; renew yearly. New subscriptions can't deploy B-series v1 (B1s) since July 2026. Disabled when the credit or the 12 months run out, unless you move to pay-as-you-go | Yes, re-read 2026-10-23 | [Azure for Students](https://azure.microsoft.com/en-us/free/students/), [capacity restrictions](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/lifecycle/retirements-and-capacity-restrictions), [Basv2](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/general-purpose/basv2-series) |
 | GCP e2-micro Free Tier | 2 shared vCPU / 1 GB, 30 GB-month disk | $0 in us-west1, us-central1 or us-east1 | MLflow only, with swap | Card required. 1 GB/month egress. An external IPv4 fee is reported but unverified | Yes | [free cloud features](https://docs.cloud.google.com/free/docs/free-cloud-features) |
 | DigitalOcean Basic Droplet, 1 GiB | 1 vCPU / 1 GiB / 25 GiB | $6/month ($0.00893/h) | Both, but tight; add swap | Powered-off Droplets still bill. The Student Pack credit ended 2026-08-01 | Yes | [droplets](https://www.digitalocean.com/pricing/droplets) |
 | DigitalOcean Basic Droplet, 2 GiB | 1 vCPU / 2 GiB / 50 GiB | $12/month ($0.01786/h) | Both, comfortably | Uses most of the budget each month | Yes, re-read 2026-10-18 | [droplets](https://www.digitalocean.com/pricing/droplets) |
@@ -172,16 +174,15 @@
 
 **Recommendation.**
 - **Dashboard:** put the public dashboard on Streamlit Community Cloud, reading result parquet files committed to the repo. Recruiters get a stable `*.streamlit.app` link at $0.
-- **MLflow:** run it on an Oracle Always Free A1 VM with docker compose (MLflow, SQLite, local artifacts, basic auth in front).
-  - A small shape such as 1 OCPU / 4 GB should keep normal memory use above Oracle's 20% idle threshold. That is my reading of the reclaim rule, not an Oracle guarantee.
-  - Even simpler: during GPU runs, log to a local `mlruns/` or SQLite file on the GPU box, rsync it home, and serve `mlflow ui` from the laptop or the Oracle VM.
-- **Fallbacks:** if Oracle rejects your card or has no A1 capacity, use Azure for Students B1s ($0, no card), then a DigitalOcean 1 GiB Droplet ($6/month).
+- **MLflow:** keep it on the laptop. `make mlflow` logs the committed runs to `mlflow.db` (+ `mlruns/`), `make mlflow-ui` serves it locally, and README screenshots show it.
+  - Do not copy an MLflow store between machines: artifact paths are absolute, so a copied `mlflow.db` keeps params and metrics but its `run.json` and `results.md` return 404. Copy the run directories and run `make mlflow` where the UI runs; logging is idempotent.
+- **If a public MLflow UI is wanted:** Fly.io (already in the hosting plan; 512 MB $3.69 or 1 GB $6.70 per month always on, much less with auto-stop; volumes $0.15/GB-month), Railway Hobby ($5/month), a DigitalOcean 1 GiB Droplet ($6/month), a Hugging Face Docker Space (needs PRO, $9/month), or Azure for Students B2ats v2 ($0, no card). Build the store inside the image from the committed runs and serve it with `--workers 1`, `MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false` and `--allowed-hosts <public host>`. Free managed MLflow (DagsHub, Databricks Free Edition) needs viewers to log in.
 
 ## Fact-check of the 2026-10-17 hosting plan
 
 | Claim (from memory, 2026-10-17) | Verdict | Current fact (2026-10-18) | Source |
 |---|---|---|---|
-| Oracle Always Free: A1 4 OCPU + 24 GB, 200 GB block, 10 TB/mo egress, permanently free, card required | OUTDATED (A1 size); the rest CONFIRMED | A1 is now 2 OCPU + 12 GB in total (1,500 OCPU-h + 9,000 GB-h/month). 200 GB block (boot and block combined) and 10 TB/month outbound are confirmed. Always Free offers "never expire", but idle instances can be reclaimed and everything must live in the home region. "Most users" need a card and a mobile number; the card isn't charged unless you upgrade. If A1 usage exceeds 2/12 when the trial ends, all A1 instances are disabled, then deleted after 30 days | [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Free Tier](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm) |
+| Oracle Always Free: A1 4 OCPU + 24 GB, 200 GB block, 10 TB/mo egress, permanently free, card required | OUTDATED (A1 size); the rest CONFIRMED on 2026-10-18; **not usable: the author's Oracle account is banned (2026-10-23)** | A1 is now 2 OCPU + 12 GB in total (1,500 OCPU-h + 9,000 GB-h/month). 200 GB block (boot and block combined) and 10 TB/month outbound are confirmed. Always Free offers "never expire", but idle instances can be reclaimed and everything must live in the home region. "Most users" need a card and a mobile number; the card isn't charged unless you upgrade. If A1 usage exceeds 2/12 when the trial ends, all A1 instances are disabled, then deleted after 30 days | [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Free Tier](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm) |
 | AWS Free Tier: 750 h/mo t2/t3.micro for 12 months, RDS db.t3.micro 750 h, S3 5 GB | OUTDATED for new accounts | New accounts get $100 at sign-up plus up to $100 for activities. The Free plan ends after 6 months or when credits run out. Free-plan accounts have only Always Free offers and can't use some services. Upgrading to Paid keeps remaining credits; the FAQ gives both 6 and 12 months as the credit expiry. The 750-hour offers are not on the current pages; they belong to accounts opened before 2025-07-15 (date from an AWS docs search snippet) | [aws.amazon.com/free](https://aws.amazon.com/free/), [AWS Billing docs](https://docs.aws.amazon.com/en_us/awsaccountbilling/latest/aboutv2/free-tier.html), [FAQ](https://aws.amazon.com/free/free-tier-faqs/) |
 | GitHub Student Pack: $100 AWS, $200 DigitalOcean, $50 Azure credit | WRONG / OUTDATED | The Pack page lists no AWS or DigitalOcean credit. The DO offer ended: last redemption 2026-07-31, credits expired 2026-08-01. Azure is $100 (age 18+), not $50. Still useful: Heroku $13/month for 24 months, Codespaces Pro, and the Camber student plan (5 GPU-h/month). Also lists VS Dev Essentials $200 Azure credit (1st month). Azure GPU VMs still need pay-as-you-go plus a quota request | [Pack](https://education.github.com/pack), [DO end notice](https://github.com/orgs/community/discussions/201240) |
 | Fly.io free tier: 3× shared-cpu-1x 256 MB, 3 GB Postgres, 160 GB outbound | OUTDATED | New organizations get no free tier and no monthly allowance. The trial is 2 h of Machine runtime or 7 days, whichever comes first. It needs no card ("You don't need a credit card to start the trial"); a card is required only to keep going after it ends. Old allowances survive only for orgs on plans discontinued in October 2024. Prices: 256 MB $2.19/month, 1 GB $6.70/month (iad); Managed Postgres from $38/month | [Fly pricing](https://docs.fly.io/about/pricing) |
@@ -199,10 +200,9 @@
 
 **Do the slow sign-ups on day 1:**
 - Thunder (usc.edu email).
-- Oracle: card and phone; the home region is chosen once and can't be changed.
 - Kaggle phone verification.
 - Meta's license for Llama-3.2-1B, plus an `HF_TOKEN` on every GPU box.
-- AWS and GCP only if you want the hyperscaler route. AWS needs a G/VT quota request (default 0; Spot quota separate). GCP needs a paid upgrade and then GPUS_ALL_REGIONS. Approval can take hours to days, or be refused for new accounts. The OCI A10 limit is "Contact Us".
+- AWS and GCP only if you want the hyperscaler route. AWS needs a G/VT quota request (default 0; Spot quota separate). GCP needs a paid upgrade and then GPUS_ALL_REGIONS. Approval can take hours to days, or be refused for new accounts.
 
 **Billing alerts and caps:**
 - Set AWS Budgets or GCP budget alerts at $5 and $15.
@@ -230,7 +230,6 @@
 - Download model weights on the GPU box; don't upload them from the laptop.
 
 **Idle hosts sleep or get reclaimed:**
-- Oracle reclaims Always Free VMs that stay idle for 7 days.
 - Streamlit Cloud apps sleep after 12 h without traffic, Render after 15 min, and Codespaces after a 30-min idle timeout.
 - Keep the README's screenshots current so a sleeping app never blocks a reviewer.
 
@@ -238,7 +237,6 @@
 - GCP's $300 expires on day 90 even after you upgrade.
 - AWS closes the Free plan at 6 months; the FAQ gives both 6 and 12 months for credit expiry.
 - Azure's free $200 lasts 30 days; Azure for Students lasts 12 months.
-- Oracle's $300 trial lasts 30 days, and paid resources created with it are reclaimed.
 - Modal's $30 is per month; rollover is not stated.
 - Thunder's promotional credit "can be revoked".
 - RunPod and Thunder preloaded credit is non-refundable. Vast says "In most cases we can refund unspent credits", on request through website chat; credit bought with crypto is not refunded.
@@ -295,9 +293,8 @@
 - https://azure.microsoft.com/en-us/free/students/
 - https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account
 - https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Virtual%20Machines'%20and%20armRegionName%20eq%20'eastus'%20and%20armSkuName%20eq%20'Standard_NC4as_T4_v3'
-- https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
-- https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm
-- https://apexapps.oracle.com/pls/apex/cetools/api/v1/products/?currencyCode=USD&partNumber=B95909
+- https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm (Oracle; account banned, kept for the fact-check record)
+- https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm (same)
 - https://www.kaggle.com/docs/efficient-gpu-usage
 - https://www.kaggle.com/product-feedback/361104
 - https://www.kaggle.com/discussions/product-feedback/743898

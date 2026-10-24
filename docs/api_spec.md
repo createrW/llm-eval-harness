@@ -19,6 +19,7 @@ llm-eval analyze --runs-root data/samples/runs [--run-dir DIR …] [--hypotheses
 llm-eval track   --runs-root data/samples/runs [--run-dir DIR …] [--analysis docs/results.md] [--tracking-uri URI]
 scripts/eval.sh configs/eval/smoke_qwen_hellaswag.yaml        # == uv run --extra local llm-eval run --config …
 scripts/run_grid.sh 3 configs/eval/local_ll.yaml configs/eval/local_gen.yaml   # each config 3 times, same seed
+scripts/check_runs.py data/processed/runs/local_ll … [--keep 3] [--copy-to data/samples/runs]   # check runs, copy the complete ones
 ```
 
 `llm-eval run`
@@ -60,8 +61,9 @@ agreement and conclusion stability across reruns. `--json` writes the same table
 (same model, task, variant and scoring) under different configs are rejected.
 
 `llm-eval track` logs each run directory to MLflow once (experiment `llm-eval-harness`; default
-store `sqlite:///mlflow.db` with artifacts under `mlruns/`) and, with `--analysis`, the results
-document and its `.json` as one more MLflow run.
+store `sqlite:///mlflow.db`; artifacts go to `./mlruns/` of the directory you run it from, whatever
+`--tracking-uri` says) and, with `--analysis`, the results document and its `.json` as one more
+MLflow run, once per distinct `.json` content.
 
 ## Config schema
 
@@ -388,7 +390,7 @@ Provenance (design §7.5) plus the per-cell summary (§8.2):
 | `config` | the post-override config, `EvalConfig.model_dump(mode="json")` in full (`output_dir` included; the hash leaves it out) |
 | `config_hash` | first 12 hex of the sha256 of `json.dumps(config without output_dir, sort_keys=True, separators=(",", ":"))` |
 | `started_at`, `finished_at` | ISO-8601 UTC timestamps |
-| `git_sha`, `git_dirty` | from `git rev-parse HEAD` / `git status --porcelain`; env `LLM_EVAL_GIT_SHA` wins (then `git_dirty` is null); null when neither is available |
+| `git_sha`, `git_dirty` | from `git rev-parse HEAD` / `git status --porcelain`; env `LLM_EVAL_GIT_SHA` wins (then `git_dirty` is null); null when neither is available. `scripts/modal_eval.py` fills `git_dirty` from its launch check (changes under `src`, `configs`, `scripts`, `pyproject.toml`, `requirements-cuda.txt`) and adds `modal_gpu` (the requested Modal GPU type) and `accelerator` (`torch.cuda.get_device_name`) |
 | `library_versions` | python, llm_eval, numpy, pandas, pyarrow, scipy, statsmodels, pydantic, and when installed torch, transformers, tokenizers, datasets, huggingface_hub |
 | `models` | per model name: `{provider, path, revision, dtype, device}`, resolved after the model's cells ran (`revision` = the 40-hex snapshot commit for `hf`, the model version(s) the API reported serving for `openai`/`anthropic`; `device` = `api` for those) |
 | `tasks` | per task name: `{path, revision, split, n_rows, example_ids}` plus `config` when the dataset has one (GSM8K: `main`); `example_ids` in subset order |

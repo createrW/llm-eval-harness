@@ -1,9 +1,21 @@
 """Streamlit dashboard: pick two cells of the model × prompt grid, compare them example by example.
 
-Run locally with ``make dashboard``; Streamlit Community Cloud runs this file from the repo.
+Run locally with ``make dashboard``; Streamlit Community Cloud runs this file from the repo and
+installs the ``requirements.txt`` next to it, which wins over the root ``uv.lock``.
 """
 
+# ruff: noqa: E402
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# That requirements.txt installs the dependencies but not this package, so import it from the
+# checkout: src/ is two levels up from this file. Streamlit reruns this script on every
+# interaction, hence the guard; an editable install already has src/ on the path.
+_SRC = str(Path(__file__).resolve().parents[2])
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
 import plotly.express as px
 import streamlit as st

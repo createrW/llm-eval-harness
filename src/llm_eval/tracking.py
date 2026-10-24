@@ -3,12 +3,14 @@
 Each run directory becomes one MLflow run in experiment ``llm-eval-harness``: tags for the run id,
 config hash and git state, the config and model revisions as params, every summary cell's primary
 accuracy, CI and n as metrics, and ``run.json`` as an artifact. Logging is idempotent: a run whose
-id is already tagged in the experiment is skipped. The store is a local SQLite file
+id is already tagged in the experiment is skipped, and so is an analysis whose tables were logged
+before. The store is a local SQLite file
 (``sqlite:///mlflow.db``, artifacts under ``mlruns/``), viewed with ``make mlflow-ui``.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -95,12 +97,16 @@ def log_analysis(
     label: str,
     tracking_uri: str = DEFAULT_URI,
     experiment: str = EXPERIMENT,
-) -> str:
-    """Log the results document and its JSON tables as one MLflow run named ``analysis/<label>``."""
+) -> str | None:
+    """Log the results document and its JSON tables as one MLflow run named ``analysis/<label>``;
+    returns ``None`` if these exact tables were logged before."""
     mlflow = _mlflow(tracking_uri, experiment)
+    digest = hashlib.sha256(Path(tables).read_bytes()).hexdigest()[:16]
+    if _already_logged(mlflow, experiment, "analysis_sha256", digest):
+        return None
     payload = json.loads(Path(tables).read_text(encoding="utf-8"))
     with mlflow.start_run(run_name=f"analysis/{label}") as active:
-        mlflow.set_tags({"kind": "analysis"})
+        mlflow.set_tags({"kind": "analysis", "analysis_sha256": digest})
         metrics = {}
         for fam in payload.get("families", []):
             prefix = f"{fam['task']}/{fam['scoring']}"

@@ -68,9 +68,12 @@ scoring so numbers are comparable, but parity is not a goal).
   `report` are the other extras; `all` = every extra. On Linux, torch resolves from the PyTorch CPU
   index (`[tool.uv.sources]`) so CI and the Docker image stay small; a CUDA box runs
   `uv pip install --torch-backend=auto torch` after `uv sync`. Two generated files, never hand-edited
-  (`make requirements`): `requirements.txt` = core + `dashboard` extra + `-e .` (what Streamlit
-  Community Cloud installs; contains no torch) and `requirements-local.txt` = core + `local` + `report`
-  with the CPU index URL emitted (for pip users running evals).
+  (`make requirements`): `requirements.txt` = core + `dashboard` extra + `-e .` (for pip users; no
+  torch) and `requirements-local.txt` = core + `local` + `report` with the CPU index URL emitted
+  (for pip users running evals). Streamlit Community Cloud installs
+  `src/llm_eval/serving/requirements.txt`, the dashboard set without the project line: a
+  dependency file next to the entry file wins over the root `uv.lock`, which Cloud would sync
+  without extras.
 - **Layout** follows `code_standard.md` (§4). The package root is `src/llm_eval/` as the brief
   requires; the standard's sub-package taxonomy (`data/ models/ features/ evaluation/ serving/`)
   lives inside it.
@@ -829,7 +832,8 @@ code and this section win.
   the analysis; `make mlflow`, `make mlflow-ui`.
 - **Dashboard** (`serving/app.py` over `serving/dashboard.py`): a selectable cell table; two
   selected rows give the paired comparison and the disagreeing examples. Deployed per the hosting
-  plan on Streamlit Community Cloud from `requirements.txt` (torch-free).
+  plan on Streamlit Community Cloud from `src/llm_eval/serving/requirements.txt` (torch-free);
+  `app.py` puts `src/` on `sys.path`, because that file does not install the package.
 - **Runs** were made from a git worktree pinned to the commit that produced them, so code edits
   during the hours-long reruns could not leak into later runs; the Day-1 smoke run moved to
   `data/samples/smoke/`. A background grid on the 16 GB laptop was stopped for low memory, so the

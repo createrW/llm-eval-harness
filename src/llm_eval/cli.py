@@ -153,7 +153,11 @@ def _track(args: argparse.Namespace) -> int:
         run_id = tracking.log_analysis(
             args.analysis, tables, label=args.analysis.stem, tracking_uri=args.tracking_uri
         )
-        print(f"logged analysis {args.analysis} as MLflow run {run_id}")
+        print(
+            f"logged analysis {args.analysis} as MLflow run {run_id}"
+            if run_id
+            else f"already logged analysis: {args.analysis}"
+        )
     return 0
 
 

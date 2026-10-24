@@ -7,7 +7,7 @@ from tests.test_analysis import OUTCOMES, make_run
 mlflow = pytest.importorskip("mlflow")
 
 
-def test_track_logs_each_run_once_and_the_analysis(tmp_path, monkeypatch, capsys):
+def test_track_logs_each_run_and_the_analysis_once(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)  # MLflow puts artifacts under ./mlruns
     runs = tmp_path / "runs"
     run_dir = make_run(runs, "run", OUTCOMES)
@@ -68,11 +68,16 @@ def test_track_logs_each_run_once_and_the_analysis(tmp_path, monkeypatch, capsys
         main(["track", "--runs-root", str(runs), "--tracking-uri", uri, "--analysis", str(results)])
         == 0
     )
-    assert main(["track", "--runs-root", str(runs), "--tracking-uri", uri]) == 0
+    assert (
+        main(["track", "--runs-root", str(runs), "--tracking-uri", uri, "--analysis", str(results)])
+        == 0
+    )
     out = capsys.readouterr().out
     lines = out.splitlines()
     assert sum(line.startswith("logged: ") for line in lines) == 1
     assert sum(line.startswith("already logged: ") for line in lines) == 1
+    assert sum(line.startswith("logged analysis ") for line in lines) == 1
+    assert sum(line.startswith("already logged analysis: ") for line in lines) == 1
     mlflow.set_tracking_uri(uri)
     logged = mlflow.search_runs(experiment_names=["llm-eval-harness"])
     by_name = dict(zip(logged["tags.mlflow.runName"], logged.index, strict=True))
@@ -80,4 +85,4 @@ def test_track_logs_each_run_once_and_the_analysis(tmp_path, monkeypatch, capsys
     assert run_row["metrics.big/gsm8k/zero_shot/primary_acc"] == pytest.approx(0.8)
     assert run_row["params.model/big"] == "x/big@0123456789ab"
     assert run_row["tags.config_hash"] == "h1"
-    assert "analysis/results" in by_name
+    assert (logged["tags.mlflow.runName"] == "analysis/results").sum() == 1

@@ -37,8 +37,8 @@ TEXT_COLUMNS = ["prompt", "target", "prediction", "generation"]
 
 
 def runs_root() -> Path:
-    """``LLM_EVAL_RUNS_ROOT`` if set, else the repo's committed runs."""
-    return Path(os.environ.get("LLM_EVAL_RUNS_ROOT", DEFAULT_RUNS))
+    """``LLM_EVAL_RUNS_ROOT`` if set and not empty, else the repo's committed runs."""
+    return Path(os.environ.get("LLM_EVAL_RUNS_ROOT") or DEFAULT_RUNS)
 
 
 @dataclass
