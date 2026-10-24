@@ -840,7 +840,10 @@ code and this section win.
   grid can also run on a cloud GPU: `scripts/modal_eval.py` (Modal; every finished run is saved to
   a volume at once) or `scripts/cloud_gpu_run.sh` (any SSH GPU machine). Reruns are grouped by
   config hash *and* hardware, as §7.5 specifies, and an analysis that mixes hardware for one
-  config is rejected.
+  config is rejected. The committed grid ran on Modal on 2026-10-24 (NVIDIA A10, about 1.5
+  GPU-hours, code `6800e2f`); test–retest agreement was 6,800 of 6,800 predictions. The laptop's
+  MPS run is kept in `data/samples/mps/local_ll/`; cross-device (MPS fp32 vs CUDA fp32) its 2,000
+  predictions are identical to the CUDA runs, with log-probabilities within 3.5e-4 nats.
 
 ### Backlog (deferred under "only what is necessary")
 
