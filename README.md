@@ -204,6 +204,13 @@ SQLite file (`mlflow.db` with artifacts in `mlruns/`, both git-ignored) that `ma
 at any time; logging is idempotent. `make mlflow-ui` serves it at http://127.0.0.1:5000 with one
 worker (about 0.4 GB of memory) and prints the address of the runs table.
 
+![The three local_gen reruns compared in MLflow: the same config, seed, model and dataset revisions](docs/img/mlflow_compare_params.png)
+
+![The same reruns' metrics: every accuracy and CI bound is identical](docs/img/mlflow_compare_metrics.png)
+
+The screenshots compare the three `local_gen` reruns in the MLflow UI. Its start time and duration
+are those of the logging, not of the evaluation; each run's own times are in its `run.json`.
+
 ## API models
 
 `configs/eval/api_gen.yaml` runs GPT-4o-mini and Claude Haiku 5.5 on the generation grid: 4,800
